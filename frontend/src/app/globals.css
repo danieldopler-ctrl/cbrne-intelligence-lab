@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --surface: #111b23;
+  --line: #20323f;
+  --muted: #8da2ae;
+  --text: #e5edf1;
+  --accent: #54b5c4;
+  --warning: #e0b55c;
+}
+
+body {
+  background: #081116;
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+input, select, textarea {
+  background: #09141b;
+  border: 1px solid var(--line);
+  border-radius: 0.375rem;
+  color: var(--text);
+  padding: 0.65rem 0.75rem;
+  width: 100%;
+}
+
+button {
+  background: var(--accent);
+  border-radius: 0.375rem;
+  color: #061016;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0.65rem 1rem;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}

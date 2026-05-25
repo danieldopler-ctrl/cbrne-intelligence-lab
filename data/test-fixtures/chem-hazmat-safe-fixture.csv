@@ -1,0 +1,4 @@
+incident_id,event_date,event_type,region,injuries,fatalities,evacuated,narrative,source_url
+TEST-CHEM-001,2026-01-01,chemical release,Test Region Alpha,6,0,0,Fictional non-operational test record,https://example.test/fixture
+TEST-CHEM-002,2026-01-02,chemical release,Test Region Alpha,0,0,0,Fictional non-operational test record,https://example.test/fixture
+TEST-CHEM-003,2026-01-03,chemical release,Test Region Alpha,0,0,0,Fictional non-operational test record,https://example.test/fixture

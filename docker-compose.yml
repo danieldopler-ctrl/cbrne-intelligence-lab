@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: cbrne_lab
+      POSTGRES_USER: cbrne
+      POSTGRES_PASSWORD: cbrne
+    ports:
+      - "5432:5432"
+    volumes:
+      - cbrne_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cbrne -d cbrne_lab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  cbrne_postgres:

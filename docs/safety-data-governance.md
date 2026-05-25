@@ -1,0 +1,30 @@
+# Safety And Data Governance
+
+## Purpose
+
+The platform supports defensive analysis of approved source records. It must not generate instructions, sourcing guidance, dispersal guidance, or procedural information that increases harmful CBRN-E capability.
+
+## Data Classes
+
+| Class | Handling |
+|---|---|
+| Public official source | May be locally ingested subject to source terms and documented limitations |
+| User-provided approved source | Local only unless publication is separately approved |
+| Restricted source | Do not ingest without authorization and appropriate security controls |
+| Test fixture | Minimal, clearly labeled, non-sensitive record used for automated testing |
+
+## Required Controls
+
+- Raw source snapshots remain local and are gitignored.
+- Each ingest stores provenance and a cryptographic hash.
+- Alerts display source limitations and evidence.
+- External reporting decisions are made by authorized humans.
+- AI summaries are deferred until evidence and review workflow can be audited.
+- Public repository review is required before publishing any data or outputs.
+
+## Prohibited System Outputs
+
+- Instructions for developing, producing, acquiring, or deploying CBRN-E agents or devices.
+- Automatic attribution of criminal or hostile intent from public records.
+- Automatic agency notification or claimed response-plan activation.
+- Unreviewed public identification of an individual, organization, or facility as a threat.
