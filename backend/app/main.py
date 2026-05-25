@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import alerts, connectors, detections, events, health, ingests, metrics, sources
+from app.routers import ai_misuse, alerts, connectors, detections, events, health, ingests, metrics, sources
 
 
 app = FastAPI(
@@ -20,6 +20,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(sources.router)
 app.include_router(connectors.router)
+app.include_router(ai_misuse.router)
 app.include_router(ingests.router)
 app.include_router(events.router)
 app.include_router(detections.router)

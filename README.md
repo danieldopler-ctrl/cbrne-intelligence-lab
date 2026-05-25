@@ -14,6 +14,7 @@ Incident monitoring foundation now includes:
 - Direct NOAA IncidentNews public-domain CSV connector for selected response-support incidents.
 - PHMSA export importer with report-level deduplication and unit-aware release scoring.
 - NRC annual workbook importer with report-level numeric consequence scoring and NRC/PHMSA correlation review alerts.
+- AI Misuse Risk Assessment Module using public-safe abstract evaluation records and separate internal review routing.
 
 This build does **not** confirm malicious intent and does **not** automatically notify external agencies. Automated detections are review priorities.
 
@@ -81,6 +82,14 @@ PHMSA delimited-text exports can be imported from the Sources screen. The import
 
 NRC annual XLSX workbooks are imported by joining the official `INCIDENT_COMMONS`, `INCIDENT_DETAILS`, and `MATERIAL_INVOLVED` sheets on `SEQNOS`. Numeric NRC injury and evacuation counts can produce count-based `TL3` review alerts. Multiple NRC material rows do not multiply consequence counts. An NRC/PHMSA match sharing an EPA RMP toxic substance, state, and three-day window creates a linked correlation alert for analyst review, not a confirmed incident match.
 
+The AI Misuse Risk Assessment Module loads a committed synthetic evaluation set made only of
+public-safe abstract descriptions. `AI_MISUSE_V0.1` assigns internal misuse review levels
+(`MR0` to `MR3`) through visible rules. It does not accept harmful prompts, call a live model, or
+route fixture records into emergency, external-notification, or response-doctrine workflows.
+Local validation routed all 34 fixture cases to their expected highest misuse-review level, with
+zero missed high-priority cases and zero unexpected escalations; this is fixture conformance, not
+model safety performance.
+
 The dashboard and default alert queue display the latest detection run so historical calibration runs are not added into current alert totals. Earlier runs remain stored for audit review.
 
 ## Threat And Escalation Handling
@@ -106,6 +115,7 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 - [Escalation and Notification Matrix](docs/escalation-and-notification-matrix.md)
 - [Response Doctrine Mapping](docs/response-doctrine-mapping.md)
 - [Domain Pack Design](docs/domain-pack-design.md)
+- [AI Misuse Risk Assessment](docs/ai-misuse-risk-assessment.md)
 
 ## Roadmap
 
@@ -114,10 +124,11 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 | Stage 0 | Verify initial public sources and common schema | Complete for NOAA, PHMSA, and NRC |
 | Stage 1 | Real data ingestion and evidence-linked CHEM alerts | Complete |
 | Stage 2 | PHMSA deduplication, calibration, and unit-aware quantity scoring | Complete |
-| Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Validated locally |
-| Stage 4 | WHO/CDC BIO monitoring connectors | Planned |
-| Stage 5 | Evaluation reports and evidence-constrained AI summaries | Planned |
-| Stage 6 | Domain expansion and deployment decision | Planned |
+| Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Complete, pushed at `58c9c25` |
+| Stage 4 | AI Misuse Risk Assessment Module | In local development |
+| Stage 5 | WHO/CDC BIO monitoring connectors | Planned |
+| Stage 6 | Evaluation reports and evidence-constrained AI summaries | Planned |
+| Stage 7 | Domain expansion and deployment decision | Planned |
 
 ## Purpose And Limits
 

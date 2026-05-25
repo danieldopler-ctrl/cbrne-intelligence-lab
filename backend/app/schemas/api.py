@@ -77,7 +77,7 @@ class EventOut(BaseModel):
 
 class DetectionRequest(BaseModel):
     ingest_batch_id: int | None = None
-    domain_pack: str = "CBRNE_CHEM"
+    domain_pack: Literal["CBRNE_CHEM", "AI_MISUSE"] = "CBRNE_CHEM"
     include_observations: bool = False
 
 
@@ -99,6 +99,9 @@ class AlertOut(BaseModel):
     status: str
     recommended_threat_level: str
     confirmed_threat_level: str | None
+    review_framework: str
+    recommended_review_level: str | None
+    confirmed_review_level: str | None
     rationale: str
     created_at: datetime
 
@@ -119,7 +122,8 @@ class ReviewCreate(BaseModel):
         "CLOSED_FALSE_POSITIVE",
         "CLOSED_NO_ACTION",
     ]
-    threat_level: Literal["TL0", "TL1", "TL2", "TL3", "TL4"]
+    threat_level: Literal["TL0", "TL1", "TL2", "TL3", "TL4"] | None = None
+    review_level: Literal["MR0", "MR1", "MR2", "MR3"] | None = None
     note: str
 
 

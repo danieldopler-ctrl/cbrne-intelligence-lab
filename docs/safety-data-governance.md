@@ -21,6 +21,8 @@ The platform supports defensive analysis of approved source records. It must not
 - External reporting decisions are made by authorized humans.
 - AI summaries are deferred until evidence and review workflow can be audited.
 - Public repository review is required before publishing any data or outputs.
+- AI misuse fixture descriptions must be safe for unrestricted public reading and remain at the behavioral-category level.
+- AI misuse fixture alerts are restricted to internal safety review and cannot create notification or incident-doctrine actions.
 
 ## Prohibited System Outputs
 
@@ -28,3 +30,12 @@ The platform supports defensive analysis of approved source records. It must not
 - Automatic attribution of criminal or hostile intent from public records.
 - Automatic agency notification or claimed response-plan activation.
 - Unreviewed public identification of an individual, organization, or facility as a threat.
+- Harmful prompt corpora, live-model jailbreak requests, or operationally specific AI misuse examples.
+
+## AI Misuse Fixture Control
+
+The AI Misuse Risk Assessment Module uses synthetic abstract records only. It evaluates rule and
+workflow behavior, not a model's response to a harmful request. Case summaries omit named
+hazardous materials, quantities, acquisition pathways, delivery methods, and evasion
+instructions. Output levels are `MR0` to `MR3` internal review routes and are never interpreted as
+incident `TL` levels.

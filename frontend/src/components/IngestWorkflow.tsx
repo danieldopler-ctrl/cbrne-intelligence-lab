@@ -133,6 +133,29 @@ export function IngestWorkflow() {
     setMessage(`${result.alerts_created} evidence-linked alerts created. Open Alerts for review.`);
   }
 
+  async function runSafeMisuseEvaluation() {
+    setBusy(true);
+    try {
+      const imported = await fetch(`${API_BASE}/ai-misuse/import-safe-evaluation`, { method: "POST" });
+      const batch = await imported.json();
+      if (!imported.ok) throw new Error(batch.detail ?? "Safe evaluation import failed.");
+      const detection = await fetch(`${API_BASE}/detections/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingest_batch_id: batch.ingest_batch_id, domain_pack: "AI_MISUSE" }),
+      });
+      const result = await detection.json();
+      if (!detection.ok) throw new Error(result.detail ?? "AI misuse assessment failed.");
+      setMessage(
+        `AI misuse safe evaluation run complete: ${batch.records_received} abstract cases and ${result.alerts_created} internal safety-review signals. No live prompts or external contacts were used.`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "AI misuse safe evaluation failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="rounded border border-[#294552] bg-[#101d24] p-6 lg:col-span-2">
@@ -160,6 +183,17 @@ export function IngestWorkflow() {
             <input name="file" type="file" accept=".txt,.tsv,.csv" required />
             <button disabled={busy} type="submit">Import PHMSA Export</button>
           </form>
+        </div>
+        <div className="mt-7 border-t border-[#294552] pt-5">
+          <p className="text-xs uppercase tracking-wide text-[#54b5c4]">Controlled Evaluation</p>
+          <h3 className="mt-2 text-lg font-medium">AI Misuse Risk Assessment Module</h3>
+          <p className="mt-2 max-w-4xl text-sm text-[#9db2bd]">
+            Load the public-safe abstract fixture set and run deterministic internal safety-review rules.
+            These records are not user prompts, model outputs, threat incidents, or external-report triggers.
+          </p>
+          <button className="mt-4" disabled={busy} onClick={runSafeMisuseEvaluation}>
+            Run Safe AI Misuse Evaluation
+          </button>
         </div>
       </section>
       <section className="rounded border border-[#20323f] bg-[#111b23] p-6">

@@ -9,11 +9,16 @@ type Alert = {
   score: number;
   status: string;
   recommended_threat_level: string;
+  review_framework: string;
+  recommended_review_level: string | null;
   created_at: string;
 };
 
-export default async function AlertsPage() {
-  const alerts = (await apiGet<Alert[]>("/alerts")) ?? [];
+export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ domain?: string }> }) {
+  const { domain } = await searchParams;
+  const domainPack = domain === "misuse" ? "AI_MISUSE" : domain === "chem" ? "CBRNE_CHEM" : null;
+  const query = domainPack ? `/alerts?domain_pack=${domainPack}` : "/alerts";
+  const alerts = (await apiGet<Alert[]>(query)) ?? [];
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <p className="text-sm uppercase tracking-[0.22em] text-[#54b5c4]">Analyst Queue</p>
@@ -22,6 +27,11 @@ export default async function AlertsPage() {
         This queue shows the latest detection run. Scores prioritize review; earlier runs remain
         available in audit history and are not added into current incident totals.
       </p>
+      <nav className="mt-5 flex gap-3 text-sm">
+        <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts">Latest run</Link>
+        <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=chem">CHEM incidents</Link>
+        <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=misuse">AI misuse review</Link>
+      </nav>
       <div className="mt-8 overflow-hidden rounded border border-[#20323f]">
         <table className="w-full text-left text-sm">
           <thead className="bg-[#111b23] text-[#8da2ae]">
@@ -41,7 +51,11 @@ export default async function AlertsPage() {
                 </td>
                 <td className="px-4 py-4">{alert.result_label}</td>
                 <td className="px-4 py-4">{alert.score}</td>
-                <td className="px-4 py-4">{alert.recommended_threat_level}</td>
+                <td className="px-4 py-4">
+                  {alert.review_framework === "AI_MISUSE_REVIEW"
+                    ? `${alert.recommended_review_level} (Misuse Review)`
+                    : alert.recommended_threat_level}
+                </td>
                 <td className="px-4 py-4">{alert.status}</td>
               </tr>
             ))}

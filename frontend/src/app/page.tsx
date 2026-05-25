@@ -64,6 +64,11 @@ export default async function Home() {
           <h2 className="mt-2 text-xl font-medium">Review detected indicators</h2>
           <p className="mt-2 text-sm text-[#9db2bd]">Examine evidence and record threat level and disposition.</p>
         </Link>
+        <Link href="/alerts?domain=misuse" className="rounded border border-[#20323f] bg-[#111b23] p-6 hover:border-[#54b5c4]">
+          <p className="text-xs uppercase text-[#54b5c4]">03 / Safety Review</p>
+          <h2 className="mt-2 text-xl font-medium">AI misuse assessment queue</h2>
+          <p className="mt-2 text-sm text-[#9db2bd]">Review abstract evaluation signals under the separate MR routing framework.</p>
+        </Link>
       </section>
     </main>
   );

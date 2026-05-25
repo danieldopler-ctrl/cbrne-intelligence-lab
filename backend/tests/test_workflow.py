@@ -1,4 +1,5 @@
 import os
+import re
 from io import BytesIO
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///./test-cbrne.db"
@@ -251,3 +252,92 @@ def test_nrc_workbook_count_rules_and_cross_source_correlation() -> None:
     )
     assert correlated["result_label"] == "CORRELATED_ALERT"
     assert correlated["recommended_threat_level"] == "TL2"
+
+
+def test_ai_misuse_safe_fixture_routes_internal_review_only() -> None:
+    imported = client.post("/ai-misuse/import-safe-evaluation")
+    assert imported.status_code == 201
+    assert imported.json()["records_received"] == 34
+    batch_id = imported.json()["ingest_batch_id"]
+    events = client.get("/events?domain=AI_MISUSE&limit=100").json()
+    assert len(events) == 34
+    assert all(event["hazard_domain"] == "AI_MISUSE" for event in events)
+    prohibited_public_fixture_terms = {
+        "quantity",
+        "material",
+        "concentration",
+        "dosage",
+        "acquire",
+        "purchase",
+        "procure",
+        "disperse",
+        "delivery method",
+        "release method",
+        "recipe",
+        "protocol",
+    }
+    for event in events:
+        narrative = (event["narrative"] or "").lower()
+        assert not re.search(r"\d", narrative)
+        assert not any(term in narrative for term in prohibited_public_fixture_terms)
+
+    run = client.post(
+        "/detections/run",
+        json={"ingest_batch_id": batch_id, "domain_pack": "AI_MISUSE"},
+    )
+    assert run.status_code == 200
+    assert run.json()["rule_set_version"] == "AI_MISUSE_V0.1"
+    assert run.json()["alerts_created"] == 35
+    alerts = client.get("/alerts?domain_pack=AI_MISUSE").json()
+    assert all(alert["review_framework"] == "AI_MISUSE_REVIEW" for alert in alerts)
+    assert any(alert["recommended_review_level"] == "MR1" for alert in alerts)
+    assert any(alert["recommended_review_level"] == "MR2" for alert in alerts)
+    mr3 = next(alert for alert in alerts if alert["recommended_review_level"] == "MR3")
+
+    detail = client.get(f"/alerts/{mr3['id']}").json()
+    assert detail["recommended_threat_level"] == "N/A"
+    review = client.post(
+        f"/alerts/{mr3['id']}/reviews",
+        json={
+            "reviewer": "safety_reviewer",
+            "disposition": "INVESTIGATE",
+            "review_level": "MR3",
+            "note": "Safe fixture safety-review test.",
+        },
+    )
+    assert review.status_code == 200
+    assert review.json()["confirmed_review_level"] == "MR3"
+    blocked_notification = client.post(
+        f"/alerts/{mr3['id']}/notifications",
+        json={
+            "threat_level": "TL3",
+            "route_type": "INTERNAL",
+            "route_name": "Not applicable",
+            "reporting_assessment": "NOT_APPLICABLE",
+            "rationale": "Must be rejected for fixture alert.",
+        },
+    )
+    assert blocked_notification.status_code == 409
+    blocked_plan = client.post(
+        f"/alerts/{mr3['id']}/plan-reviews",
+        json={
+            "plan_code": "NIMS_ICS",
+            "applicability": "NOT_APPLICABLE",
+            "rationale": "Must be rejected for fixture alert.",
+            "reviewer": "safety_reviewer",
+        },
+    )
+    assert blocked_plan.status_code == 409
+    evaluation = client.get("/ai-misuse/evaluation/latest")
+    assert evaluation.status_code == 200
+    result = evaluation.json()
+    assert result["cases_evaluated"] == 34
+    assert result["exact_routing_agreement"] == 34
+    assert result["missed_escalation_cases"] == 0
+    assert result["unexpected_escalations"] == 0
+    assert "Fixture conformance only" in result["claim_limit"]
+
+
+def test_unknown_detection_domain_is_rejected() -> None:
+    response = client.post("/detections/run", json={"domain_pack": "UNKNOWN_PACK"})
+    assert response.status_code == 422

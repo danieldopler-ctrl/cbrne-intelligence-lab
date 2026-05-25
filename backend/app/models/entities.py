@@ -118,6 +118,9 @@ class Alert(Base):
     status: Mapped[str] = mapped_column(String(40), default="NEW")
     recommended_threat_level: Mapped[str] = mapped_column(String(10), default="TL1")
     confirmed_threat_level: Mapped[str | None] = mapped_column(String(10))
+    review_framework: Mapped[str] = mapped_column(String(30), default="THREAT_LEVEL")
+    recommended_review_level: Mapped[str | None] = mapped_column(String(10))
+    confirmed_review_level: Mapped[str | None] = mapped_column(String(10))
     rationale: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -139,6 +142,8 @@ class AnalystReview(Base):
     reviewer: Mapped[str] = mapped_column(String(100))
     disposition: Mapped[str] = mapped_column(String(50))
     threat_level: Mapped[str] = mapped_column(String(10))
+    review_framework: Mapped[str] = mapped_column(String(30), default="THREAT_LEVEL")
+    review_level: Mapped[str | None] = mapped_column(String(10))
     note: Mapped[str] = mapped_column(Text)
     reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

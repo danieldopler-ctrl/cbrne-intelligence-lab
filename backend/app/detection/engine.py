@@ -67,6 +67,8 @@ def create_alert(
         score=score,
         confidence="SOURCE_DERIVED",
         recommended_threat_level=recommended_level,
+        review_framework="THREAT_LEVEL",
+        recommended_review_level=recommended_level,
         rationale=rationale,
     )
     db.add(alert)

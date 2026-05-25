@@ -3,9 +3,10 @@
 import { FormEvent, useState } from "react";
 import { API_BASE } from "@/lib/api";
 
-export function AlertReviewPanel({ alertId }: { alertId: number }) {
+export function AlertReviewPanel({ alertId, reviewFramework }: { alertId: number; reviewFramework: string }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const isMisuseReview = reviewFramework === "AI_MISUSE_REVIEW";
 
   async function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,9 +59,15 @@ export function AlertReviewPanel({ alertId }: { alertId: number }) {
         <h2 className="text-xl font-medium">Analyst disposition</h2>
         <div className="mt-5 space-y-4">
           <input name="reviewer" placeholder="Reviewer identifier" required />
-          <select name="threat_level" defaultValue="TL2">
-            {["TL0", "TL1", "TL2", "TL3", "TL4"].map((level) => <option key={level}>{level}</option>)}
-          </select>
+          {isMisuseReview ? (
+            <select name="review_level" defaultValue="MR2">
+              {["MR0", "MR1", "MR2", "MR3"].map((level) => <option key={level}>{level}</option>)}
+            </select>
+          ) : (
+            <select name="threat_level" defaultValue="TL2">
+              {["TL0", "TL1", "TL2", "TL3", "TL4"].map((level) => <option key={level}>{level}</option>)}
+            </select>
+          )}
           <select name="disposition" defaultValue="INVESTIGATE">
             {["MONITOR", "INVESTIGATE", "ESCALATE", "CLOSED_FALSE_POSITIVE", "CLOSED_NO_ACTION"].map((value) => (
               <option key={value}>{value}</option>
@@ -70,7 +77,7 @@ export function AlertReviewPanel({ alertId }: { alertId: number }) {
           <button disabled={busy} type="submit">Record Review</button>
         </div>
       </form>
-      <form onSubmit={submitPlan} className="rounded border border-[#20323f] bg-[#111b23] p-6">
+      {!isMisuseReview && <form onSubmit={submitPlan} className="rounded border border-[#20323f] bg-[#111b23] p-6">
         <h2 className="text-xl font-medium">Response doctrine review</h2>
         <p className="mt-2 text-sm text-[#9db2bd]">
           Potential applicability is not agency activation. Use verified status only with a documented reference.
@@ -96,8 +103,8 @@ export function AlertReviewPanel({ alertId }: { alertId: number }) {
           <textarea name="rationale" rows={3} placeholder="Applicability rationale" required />
           <button disabled={busy} type="submit">Record Plan Review</button>
         </div>
-      </form>
-      <form onSubmit={submitNotification} className="rounded border border-[#20323f] bg-[#111b23] p-6 lg:col-span-2">
+      </form>}
+      {!isMisuseReview && <form onSubmit={submitNotification} className="rounded border border-[#20323f] bg-[#111b23] p-6 lg:col-span-2">
         <h2 className="text-xl font-medium">Notification assessment</h2>
         <p className="mt-2 text-sm text-[#9db2bd]">
           This records a decision or completed contact. The platform does not send notifications.
@@ -121,7 +128,15 @@ export function AlertReviewPanel({ alertId }: { alertId: number }) {
           <textarea className="md:col-span-2" name="rationale" rows={3} placeholder="Decision rationale and follow-up owner" required />
           <button disabled={busy} type="submit">Record Notification Assessment</button>
         </div>
-      </form>
+      </form>}
+      {isMisuseReview && (
+        <div className="rounded border border-[#294552] bg-[#101d24] p-6">
+          <h2 className="text-xl font-medium">Internal safety review only</h2>
+          <p className="mt-3 text-sm text-[#9db2bd]">
+            External notification and response-doctrine actions are disabled for synthetic AI misuse evaluation cases.
+          </p>
+        </div>
+      )}
       {message && <p className="lg:col-span-2 rounded border border-[#294552] bg-[#101d24] p-4 text-[#b9d3dc]">{message}</p>}
     </section>
   );

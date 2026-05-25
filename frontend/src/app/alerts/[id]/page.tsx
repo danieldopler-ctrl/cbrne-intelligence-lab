@@ -12,6 +12,9 @@ type AlertDetail = {
   status: string;
   recommended_threat_level: string;
   confirmed_threat_level: string | null;
+  review_framework: string;
+  recommended_review_level: string | null;
+  confirmed_review_level: string | null;
   rationale: string;
   evidence: Array<{
     source_record_id: string;
@@ -36,6 +39,7 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
       </main>
     );
   }
+  const isMisuseReview = alert.review_framework === "AI_MISUSE_REVIEW";
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
       <Link href="/alerts" className="text-sm text-[#75cad7]">Back to alert queue</Link>
@@ -47,17 +51,28 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
         </div>
         <div className="rounded border border-[#20323f] bg-[#111b23] p-5 text-sm">
           <p>Score <strong className="ml-2 text-xl text-white">{alert.score}</strong></p>
-          <p className="mt-2">Recommended: {alert.recommended_threat_level}</p>
-          <p className="mt-2">Confirmed: {alert.confirmed_threat_level ?? "Pending review"}</p>
+          <p className="mt-2">
+            {isMisuseReview ? "Misuse Review Level" : "Recommended Threat Level"}:{" "}
+            {isMisuseReview ? alert.recommended_review_level : alert.recommended_threat_level}
+          </p>
+          <p className="mt-2">
+            Confirmed: {isMisuseReview ? alert.confirmed_review_level ?? "Pending review" : alert.confirmed_threat_level ?? "Pending review"}
+          </p>
         </div>
       </div>
-      {alert.confirmed_threat_level === "TL4" && (
+      {isMisuseReview && (
+        <div className="mt-7 rounded border border-[#294552] bg-[#101d24] p-5 text-[#b9d3dc]">
+          Controlled internal safety-review case. This is not a real user record or incident and does not
+          open emergency, external-notification, or response-doctrine workflows.
+        </div>
+      )}
+      {!isMisuseReview && alert.confirmed_threat_level === "TL4" && (
         <div className="mt-7 rounded border border-[#614a20] bg-[#1a140b] p-5 text-[#e4c275]">
           An emergency or mandatory-report condition must not wait for application workflow. Contact appropriate
           responders and complete required reporting when facts support it.
         </div>
       )}
-      {alert.confirmed_threat_level !== "TL4" && alert.recommended_threat_level === "TL3" && (
+      {!isMisuseReview && alert.confirmed_threat_level !== "TL4" && alert.recommended_threat_level === "TL3" && (
         <div className="mt-7 rounded border border-[#614a20] bg-[#1a140b] p-5 text-[#e4c275]">
           Urgent analyst review recommended. If review establishes immediate danger or a mandatory-report
           condition, do not delay appropriate response or reporting.
@@ -76,7 +91,7 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
       </section>
-      <section className="mt-8 grid gap-6 lg:grid-cols-2">
+      {!isMisuseReview && <section className="mt-8 grid gap-6 lg:grid-cols-2">
         <div className="rounded border border-[#20323f] bg-[#111b23] p-6">
           <h2 className="text-xl font-medium">Recorded notification actions</h2>
           {alert.notifications.length === 0 ? (
@@ -107,8 +122,8 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
             </div>
           )}
         </div>
-      </section>
-      <AlertReviewPanel alertId={alert.id} />
+      </section>}
+      <AlertReviewPanel alertId={alert.id} reviewFramework={alert.review_framework} />
     </main>
   );
 }

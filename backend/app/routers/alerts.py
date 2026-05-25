@@ -30,6 +30,7 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 def list_alerts(
     status: str | None = None,
     detection_run_id: int | None = None,
+    domain_pack: str | None = None,
     include_history: bool = False,
     db: Session = Depends(get_db),
 ) -> list[Alert]:
@@ -37,9 +38,16 @@ def list_alerts(
     if detection_run_id is not None:
         query = query.where(Alert.detection_run_id == detection_run_id)
     elif not include_history:
-        latest_run_id = db.scalar(select(DetectionRun.id).order_by(DetectionRun.id.desc()).limit(1))
+        latest_query = select(DetectionRun.id).order_by(DetectionRun.id.desc()).limit(1)
+        if domain_pack:
+            latest_query = latest_query.where(DetectionRun.domain_pack == domain_pack)
+        latest_run_id = db.scalar(latest_query)
         if latest_run_id is not None:
             query = query.where(Alert.detection_run_id == latest_run_id)
+        elif domain_pack:
+            return []
+    elif domain_pack:
+        query = query.join(DetectionRun).where(DetectionRun.domain_pack == domain_pack)
     if status:
         query = query.where(Alert.status == status)
     return list(db.scalars(query).all())
@@ -83,6 +91,8 @@ def get_alert(alert_id: int, db: Session = Depends(get_db)) -> AlertDetail:
                 "reviewer": review.reviewer,
                 "disposition": review.disposition,
                 "threat_level": review.threat_level,
+                "review_framework": review.review_framework,
+                "review_level": review.review_level,
                 "note": review.note,
                 "reviewed_at": review.reviewed_at,
             }
@@ -116,16 +126,44 @@ def review_alert(alert_id: int, payload: ReviewCreate, db: Session = Depends(get
     alert = db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found.")
-    db.add(AnalystReview(alert_id=alert_id, **payload.model_dump()))
+    if alert.review_framework == "AI_MISUSE_REVIEW":
+        if not payload.review_level:
+            raise HTTPException(status_code=422, detail="Misuse review requires an MR0-MR3 review level.")
+        review = AnalystReview(
+            alert_id=alert_id,
+            reviewer=payload.reviewer,
+            disposition=payload.disposition,
+            threat_level="N/A",
+            review_framework="AI_MISUSE_REVIEW",
+            review_level=payload.review_level,
+            note=payload.note,
+        )
+        alert.confirmed_review_level = payload.review_level
+        level_metadata = {"review_framework": "AI_MISUSE_REVIEW", "review_level": payload.review_level}
+    else:
+        if not payload.threat_level:
+            raise HTTPException(status_code=422, detail="Threat review requires a TL0-TL4 threat level.")
+        review = AnalystReview(
+            alert_id=alert_id,
+            reviewer=payload.reviewer,
+            disposition=payload.disposition,
+            threat_level=payload.threat_level,
+            review_framework="THREAT_LEVEL",
+            review_level=payload.threat_level,
+            note=payload.note,
+        )
+        alert.confirmed_threat_level = payload.threat_level
+        alert.confirmed_review_level = payload.threat_level
+        level_metadata = {"review_framework": "THREAT_LEVEL", "threat_level": payload.threat_level}
+    db.add(review)
     alert.status = payload.disposition
-    alert.confirmed_threat_level = payload.threat_level
     record_audit(
         db,
         "ALERT_REVIEWED",
         "alert",
         alert_id,
         actor=payload.reviewer,
-        metadata={"disposition": payload.disposition, "threat_level": payload.threat_level},
+        metadata={"disposition": payload.disposition, **level_metadata},
     )
     db.commit()
     db.refresh(alert)
@@ -139,6 +177,11 @@ def add_notification(
     alert = db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found.")
+    if alert.review_framework == "AI_MISUSE_REVIEW":
+        raise HTTPException(
+            status_code=409,
+            detail="AI misuse fixture alerts use internal safety review only; notification actions are disabled.",
+        )
     action = NotificationAction(alert_id=alert_id, **payload.model_dump())
     db.add(action)
     db.flush()
@@ -154,6 +197,11 @@ def add_plan_review(
     alert = db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found.")
+    if alert.review_framework == "AI_MISUSE_REVIEW":
+        raise HTTPException(
+            status_code=409,
+            detail="AI misuse fixture alerts are not incident records; doctrine review is disabled.",
+        )
     review = PlanApplicabilityReview(alert_id=alert_id, **payload.model_dump())
     db.add(review)
     db.flush()

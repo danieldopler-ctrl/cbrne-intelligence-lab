@@ -23,3 +23,13 @@ A fraud domain pack can use the same core workflow, but it needs:
 - A separate escalation and external-referral framework based on the operating entity's obligations.
 
 Machine-learning training is deferred until lawful, representative, labeled outcomes exist and can be measured against transparent rule performance.
+
+## AI Misuse Risk Assessment Pack
+
+`AI_MISUSE_V0.1` reuses source provenance, normalized records, rules, alerts, reviews, evaluation,
+and audit history. It uses separate internal review levels (`MR0` through `MR3`) because a
+synthetic assessment-case signal is not a real-world incident or a mandatory-report condition.
+
+Initial input is a public-safe abstract fixture set only. The pack does not accept free-form
+prompts, call an AI provider, store model completions, or open response-doctrine or external
+notification workflows.
