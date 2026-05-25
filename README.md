@@ -6,13 +6,14 @@ CBRN-E is the first domain pack. The platform core is designed so a later approv
 
 ## Current Build Status
 
-Stage 1 foundation is in progress:
+Incident monitoring foundation now includes:
 
 - PostgreSQL-backed application model and migration.
 - FastAPI endpoints for sources, ingestion, normalized events, detection runs, alerts, analyst reviews, notifications, and response-doctrine review.
 - Next.js analyst interface for source registration, dataset upload, and alert review.
 - Direct NOAA IncidentNews public-domain CSV connector for selected response-support incidents.
-- Initial CHEM/hazmat rule set intended for NOAA records and later PHMSA or NRC-formatted public records after field mapping.
+- PHMSA export importer with report-level deduplication and unit-aware release scoring.
+- NRC annual workbook importer with report-level numeric consequence scoring and NRC/PHMSA correlation review alerts.
 
 This build does **not** confirm malicious intent and does **not** automatically notify external agencies. Automated detections are review priorities.
 
@@ -78,6 +79,8 @@ NOAA commodity names are normalized into a dedicated event field. `CHEM-SUBSTANC
 
 PHMSA delimited-text exports can be imported from the Sources screen. The importer maps `Total Hazmat Fatalities` as a numeric count and converts `Hazmat Injury Indicator` and `Serious Evacuations` values of `Yes` to `TL2` reported-consequence signals for `CHEM-CONSEQUENCE-001`; the indicators are not counts. Stage 2 uses `Report Number` to avoid duplicate incident-level consequence alerts and applies `CHEM-RELEASE-QUANTITY-001` only to quantities reported by PHMSA as standardized liquid gallons (`LGA`). `GCF` and `SLB` data remain preserved without conversion.
 
+NRC annual XLSX workbooks are imported by joining the official `INCIDENT_COMMONS`, `INCIDENT_DETAILS`, and `MATERIAL_INVOLVED` sheets on `SEQNOS`. Numeric NRC injury and evacuation counts can produce count-based `TL3` review alerts. Multiple NRC material rows do not multiply consequence counts. An NRC/PHMSA match sharing an EPA RMP toxic substance, state, and three-day window creates a linked correlation alert for analyst review, not a confirmed incident match.
+
 The dashboard and default alert queue display the latest detection run so historical calibration runs are not added into current alert totals. Earlier runs remain stored for audit review.
 
 ## Threat And Escalation Handling
@@ -108,12 +111,13 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 
 | Stage | Objective | Status |
 |---|---|---|
-| Stage 0 | Verify initial public sources and common schema | In progress |
-| Stage 1 | Real data ingestion and evidence-linked CHEM alerts | In progress |
-| Stage 2 | Chemical/hazmat backtesting and review metrics | Planned |
-| Stage 3 | WHO/CDC BIO monitoring connectors | Planned |
-| Stage 4 | Evaluation reports and evidence-constrained AI summaries | Planned |
-| Stage 5 | Domain expansion and deployment decision | Planned |
+| Stage 0 | Verify initial public sources and common schema | Complete for NOAA, PHMSA, and NRC |
+| Stage 1 | Real data ingestion and evidence-linked CHEM alerts | Complete |
+| Stage 2 | PHMSA deduplication, calibration, and unit-aware quantity scoring | Complete |
+| Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Validated locally |
+| Stage 4 | WHO/CDC BIO monitoring connectors | Planned |
+| Stage 5 | Evaluation reports and evidence-constrained AI summaries | Planned |
+| Stage 6 | Domain expansion and deployment decision | Planned |
 
 ## Purpose And Limits
 

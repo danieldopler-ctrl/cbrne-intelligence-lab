@@ -7,6 +7,7 @@ from app.audit.service import record_audit
 from app.config import settings
 from app.database import get_db
 from app.ingestion.delimited_upload import as_float, as_int, hash_bytes, parse_records, raw_record_hash, store_raw_file
+from app.ingestion.nrc_workbook import parse_nrc_workbook
 from app.models import IngestBatch, NormalizedEvent, RawRecord, Source
 from app.schemas.api import ConnectorSyncResult
 
@@ -32,6 +33,14 @@ PHMSA_LIMITATIONS = (
     "identity before aggregating alerts or consequences. Release quantities are scored only when "
     "PHMSA supplies standardized liquid gallons (`LGA`); gas cubic feet and solid pounds are "
     "preserved without gallon conversion."
+)
+NRC_SOURCE_NAME = "National Response Center Annual Incident Data"
+NRC_SOURCE_URL = "https://nrc.uscg.mil/"
+NRC_LIMITATIONS = (
+    "NRC public workbooks contain initial, unvalidated incident data supplied during incident "
+    "reporting. Data may be incomplete, inaccurate, or later revised. Numeric consequence fields "
+    "are report-level values and are not multiplied across material rows. Records support "
+    "analyst triage and correlation; they do not establish malicious intent or validated cause."
 )
 
 
@@ -90,6 +99,26 @@ def get_or_create_phmsa_source(db: Session) -> Source:
     db.add(source)
     db.flush()
     record_audit(db, "SOURCE_REGISTERED", "source", source.id, actor="phmsa_connector")
+    return source
+
+
+def get_or_create_nrc_source(db: Session) -> Source:
+    source = db.scalar(select(Source).where(Source.name == NRC_SOURCE_NAME))
+    if source:
+        source.limitations = NRC_LIMITATIONS
+        return source
+    source = Source(
+        name=NRC_SOURCE_NAME,
+        organization="U.S. Coast Guard National Response Center",
+        url=NRC_SOURCE_URL,
+        source_type="PUBLIC_OFFICIAL_XLSX",
+        modality="CHEM",
+        access_terms="Public incident data workbook released through the NRC FOIA data portal.",
+        limitations=NRC_LIMITATIONS,
+    )
+    db.add(source)
+    db.flush()
+    record_audit(db, "SOURCE_REGISTERED", "source", source.id, actor="nrc_connector")
     return source
 
 
@@ -261,6 +290,93 @@ async def import_phmsa_hazmat_export(
         ingest_batch_id=batch.id,
         records_received=len(records),
         chemical_events=len(records),
+        sha256=batch.sha256,
+        mapping_version=batch.mapping_version,
+    )
+
+
+@router.post("/nrc/import", response_model=ConnectorSyncResult, status_code=201)
+async def import_nrc_workbook(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+) -> ConnectorSyncResult:
+    filename = file.filename or "nrc-annual-incident-data.xlsx"
+    if not filename.casefold().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="NRC import requires the official XLSX workbook format.")
+    content = await file.read()
+    try:
+        records, headers = parse_nrc_workbook(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    source = get_or_create_nrc_source(db)
+    stored_path = store_raw_file(settings.data_dir / "raw", filename, content)
+    batch = IngestBatch(
+        source_id=source.id,
+        original_filename=filename,
+        stored_path=str(stored_path),
+        sha256=hash_bytes(content),
+        record_count=len(records),
+        mapping_version="nrc-cy-workbook-v1",
+        status="NORMALIZED",
+    )
+    db.add(batch)
+    db.flush()
+    material_rows = 0
+    chemical_events = 0
+    for record in records:
+        source_rows = record["source_rows"]
+        material_rows += len(source_rows["materials"])
+        raw = RawRecord(
+            ingest_batch_id=batch.id,
+            source_record_id=record["report_id"],
+            payload=source_rows,
+            raw_hash=raw_record_hash(source_rows),
+        )
+        db.add(raw)
+        db.flush()
+        hazard_domain = "CHEM" if record["commodities"] else "OTHER"
+        if hazard_domain == "CHEM":
+            chemical_events += 1
+        db.add(
+            NormalizedEvent(
+                source_id=source.id,
+                ingest_batch_id=batch.id,
+                raw_record_id=raw.id,
+                source_record_id=record["report_id"],
+                event_date=record["event_date"],
+                reported_date=None,
+                hazard_domain=hazard_domain,
+                event_type="reported environmental release",
+                region=record["region"],
+                commodity=record["commodity"],
+                severity_features=record["severity_features"],
+                narrative=record["narrative"],
+                source_url=source.url,
+                data_classification="PUBLIC",
+                limitations=NRC_LIMITATIONS,
+            )
+        )
+    record_audit(
+        db,
+        "OFFICIAL_EXPORT_IMPORTED",
+        "ingest_batch",
+        batch.id,
+        actor="nrc_connector",
+        metadata={
+            "source": NRC_SOURCE_NAME,
+            "reports": len(records),
+            "material_rows": material_rows,
+            "chemical_events": chemical_events,
+            "worksheet_headers": headers,
+        },
+    )
+    db.commit()
+    return ConnectorSyncResult(
+        source_id=source.id,
+        ingest_batch_id=batch.id,
+        records_received=len(records),
+        chemical_events=chemical_events,
         sha256=batch.sha256,
         mapping_version=batch.mapping_version,
     )

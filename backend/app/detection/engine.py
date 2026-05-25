@@ -1,4 +1,5 @@
 from collections import Counter, defaultdict
+from datetime import date
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from app.domain_packs.cbrne.chem_hazmat_rules import (
     DEFAULT_RULES,
     RULE_SET_VERSION,
     consequence_result,
+    count_consequence_results,
     potential_release_result,
     reported_liquid_release_result,
     substance_result,
@@ -46,6 +48,7 @@ def create_alert(
     label: str,
     rationale: str,
     evidence: dict,
+    additional_evidence_events: list[NormalizedEvent] | None = None,
 ) -> Alert:
     indicator = Indicator(
         event_id=event.id,
@@ -69,6 +72,9 @@ def create_alert(
     db.add(alert)
     db.flush()
     db.add(AlertEvidence(alert_id=alert.id, event_id=event.id, indicator_id=indicator.id))
+    for related_event in additional_evidence_events or []:
+        if related_event.id != event.id:
+            db.add(AlertEvidence(alert_id=alert.id, event_id=related_event.id, indicator_id=indicator.id))
     record_audit(db, "ALERT_CREATED", "alert", alert.id, metadata={"rule_id": rule.rule_id})
     return alert
 
@@ -91,11 +97,67 @@ def run_detection(
     db.flush()
     alert_count = 0
     chemical_events = [event for event in events if event.hazard_domain == "CHEM"]
-    incident_groups: dict[str, list[NormalizedEvent]] = defaultdict(list)
+    incident_groups: dict[tuple[int, str], list[NormalizedEvent]] = defaultdict(list)
     for event in chemical_events:
-        incident_groups[event.source_record_id].append(event)
+        incident_groups[(event.source_id, event.source_record_id)].append(event)
 
-    for incident_id, incident_events in incident_groups.items():
+    for (_, incident_id), incident_events in incident_groups.items():
+        is_count_bearing = any(
+            (event.severity_features or {}).get("source_capability") == "count_bearing"
+            for event in incident_events
+        )
+        if is_count_bearing:
+            count_features: dict[str, object] = {
+                "source_capability": "count_bearing",
+                "injuries_count": max(
+                    int((event.severity_features or {}).get("injuries_count", 0) or 0)
+                    for event in incident_events
+                ),
+                "fatalities_count": max(
+                    int((event.severity_features or {}).get("fatalities_count", 0) or 0)
+                    for event in incident_events
+                ),
+                "evacuations_count": max(
+                    int((event.severity_features or {}).get("evacuations_count", 0) or 0)
+                    for event in incident_events
+                ),
+                "incident_rows_evaluated": len(incident_events),
+            }
+            for rule_id, score, priority, level in count_consequence_results(count_features):
+                create_alert(
+                    db,
+                    run,
+                    rules[rule_id],
+                    incident_events[0],
+                    score=score,
+                    priority=priority,
+                    recommended_level=level,
+                    label="INDICATOR",
+                    rationale=(
+                        "NRC reports count-bearing consequence data that exceeds the documented "
+                        "review threshold. Counts are evaluated once per NRC report."
+                    ),
+                    evidence={"incident_id": incident_id, **count_features},
+                )
+                alert_count += 1
+            if int(count_features["fatalities_count"]) > 0:
+                score, priority, level = consequence_result(
+                    {"fatalities": count_features["fatalities_count"], "injuries": 0, "evacuated": 0}
+                )
+                create_alert(
+                    db,
+                    run,
+                    rules["CHEM-CONSEQUENCE-001"],
+                    incident_events[0],
+                    score=score,
+                    priority=priority,
+                    recommended_level=level,
+                    label="INDICATOR",
+                    rationale="NRC report includes one or more reported fatalities.",
+                    evidence={"incident_id": incident_id, **count_features},
+                )
+                alert_count += 1
+            continue
         consequence_features: dict[str, object] = {
             "fatalities": max(int((event.severity_features or {}).get("fatalities", 0) or 0) for event in incident_events),
             "injuries": max(int((event.severity_features or {}).get("injuries", 0) or 0) for event in incident_events),
@@ -133,14 +195,26 @@ def run_detection(
             )
             alert_count += 1
 
-    liquid_release_groups: dict[tuple[str, str], list[NormalizedEvent]] = defaultdict(list)
+    liquid_release_groups: dict[tuple[int, str, str], list[NormalizedEvent]] = defaultdict(list)
     for event in chemical_events:
         features = event.severity_features or {}
         if features.get("quantity_unit") == "LGA" and features.get("quantity_released_liquid_gallons") is not None:
-            liquid_release_groups[(event.source_record_id, event.commodity or "Unspecified commodity")].append(event)
-    for (incident_id, commodity), release_events in liquid_release_groups.items():
+            liquid_release_groups[
+                (event.source_id, event.source_record_id, event.commodity or "Unspecified commodity")
+            ].append(event)
+        elif features.get("quantity_released_gallons") is not None:
+            liquid_release_groups[
+                (event.source_id, event.source_record_id, event.commodity or "Multiple materials")
+            ].append(event)
+    for (_, incident_id, commodity), release_events in liquid_release_groups.items():
         liquid_gallons = sum(
-            float((event.severity_features or {}).get("quantity_released_liquid_gallons", 0) or 0)
+            float(
+                (event.severity_features or {}).get(
+                    "quantity_released_liquid_gallons",
+                    (event.severity_features or {}).get("quantity_released_gallons", 0),
+                )
+                or 0
+            )
             for event in release_events
         )
         release_result = reported_liquid_release_result(liquid_gallons)
@@ -156,24 +230,37 @@ def run_detection(
                 recommended_level=level,
                 label="INDICATOR",
                 rationale=(
-                    "PHMSA reports a large released quantity in standardized liquid gallons (LGA). "
-                    "Rows are aggregated per incident and commodity; this is not an intent finding."
+                    "Source reports a large released liquid quantity in gallons or supported converted "
+                    "liquid-volume units. This is not an intent finding."
                 ),
                 evidence={
                     "incident_id": incident_id,
                     "commodity": commodity,
                     "reported_liquid_release_gallons": liquid_gallons,
-                    "quantity_unit": "LGA",
+                    "quantity_unit": (
+                        "LGA"
+                        if (release_events[0].severity_features or {}).get("quantity_unit") == "LGA"
+                        else "CONVERTED_TO_GALLONS"
+                    ),
                     "rows_aggregated": len(release_events),
+                    "conversion_approximate": any(
+                        bool((event.severity_features or {}).get("quantity_gallons_approximate"))
+                        for event in release_events
+                    ),
                 },
             )
             alert_count += 1
 
+    recurrence_events = [
+        event
+        for event in chemical_events
+        if (event.severity_features or {}).get("source_system") != "NRC"
+    ]
     period_regions = Counter(
         (event.region, event.event_date[:7])
         for event in {
-            event.source_record_id: event
-            for event in chemical_events
+            (event.source_id, event.source_record_id): event
+            for event in recurrence_events
             if event.region and event.event_date and len(event.event_date) >= 7
         }.values()
     )
@@ -199,35 +286,37 @@ def run_detection(
                 evidence={"maximum_potential_release_gallons": event.severity_features["quantity_released"]},
             )
             alert_count += 1
-        substance_match = substance_result(event.commodity)
-        if event.hazard_domain == "CHEM" and substance_match:
-            score, priority, level, match = substance_match
-            substance_key = (event.source_record_id, match.regulated_substance)
-            if substance_key not in substance_alerted:
-                create_alert(
-                    db,
-                    run,
-                    rules["CHEM-SUBSTANCE-001"],
-                    event,
-                    score=score,
-                    priority=priority,
-                    recommended_level=level,
-                    label="INDICATOR",
-                    rationale=(
-                        "Source commodity text matches an EPA RMP regulated toxic substance. "
-                        "This is a review priority signal, not a finding of intent, quantity, "
-                        "release consequence, or regulatory applicability."
-                    ),
-                    evidence={
-                        "incident_id": event.source_record_id,
-                        "source_commodity": match.source_commodity,
-                        "epa_rmp_toxic_substance": match.regulated_substance,
-                        "match_method": match.match_method,
-                        "reference": EPA_RMP_TOXIC_REFERENCE_URL,
-                    },
-                )
-                alert_count += 1
-                substance_alerted.add(substance_key)
+        commodities = (event.severity_features or {}).get("commodities") or [event.commodity]
+        for commodity in commodities:
+            substance_match = substance_result(commodity)
+            if event.hazard_domain == "CHEM" and substance_match:
+                score, priority, level, match = substance_match
+                substance_key = (event.source_record_id, match.regulated_substance)
+                if substance_key not in substance_alerted:
+                    create_alert(
+                        db,
+                        run,
+                        rules["CHEM-SUBSTANCE-001"],
+                        event,
+                        score=score,
+                        priority=priority,
+                        recommended_level=level,
+                        label="INDICATOR",
+                        rationale=(
+                            "Source commodity text matches an EPA RMP regulated toxic substance. "
+                            "This is a review priority signal, not a finding of intent, quantity, "
+                            "release consequence, or regulatory applicability."
+                        ),
+                        evidence={
+                            "incident_id": event.source_record_id,
+                            "source_commodity": match.source_commodity,
+                            "epa_rmp_toxic_substance": match.regulated_substance,
+                            "match_method": match.match_method,
+                            "reference": EPA_RMP_TOXIC_REFERENCE_URL,
+                        },
+                    )
+                    alert_count += 1
+                    substance_alerted.add(substance_key)
         if include_observations and event.hazard_domain == "CHEM" and "release" in event.event_type.lower():
             create_alert(
                 db,
@@ -249,6 +338,7 @@ def run_detection(
         )
         if (
             event.hazard_domain == "CHEM"
+            and (event.severity_features or {}).get("source_system") != "NRC"
             and cluster_key
             and period_regions[cluster_key] >= 3
             and cluster_key not in cluster_alerted
@@ -274,8 +364,87 @@ def run_detection(
             )
             alert_count += 1
             cluster_alerted.add(cluster_key)
+
+    if ingest_batch_id is not None:
+        nrc_events = [
+            event for event in chemical_events if (event.severity_features or {}).get("source_system") == "NRC"
+        ]
+        all_events = db.scalars(select(NormalizedEvent)).all()
+        phmsa_events = list(
+            {
+                (event.source_id, event.source_record_id, event.event_date): event
+                for event in all_events
+                if (event.severity_features or {}).get("consequence_basis")
+                == "binary_indicators_with_numeric_fatalities"
+            }.values()
+        )
+        correlated_pairs: set[tuple[int, int]] = set()
+        for nrc_event in nrc_events:
+            nrc_state = _state_code(nrc_event.region)
+            nrc_date = _date_value(nrc_event.event_date)
+            if not nrc_state or not nrc_date:
+                continue
+            for phmsa_event in phmsa_events:
+                if _state_code(phmsa_event.region) != nrc_state:
+                    continue
+                phmsa_date = _date_value(phmsa_event.event_date)
+                if not phmsa_date or abs((nrc_date - phmsa_date).days) > 3:
+                    continue
+                shared_substances = _regulated_substances(nrc_event) & _regulated_substances(phmsa_event)
+                if not shared_substances:
+                    continue
+                pair = (nrc_event.id, phmsa_event.id)
+                if pair in correlated_pairs:
+                    continue
+                create_alert(
+                    db,
+                    run,
+                    rules["CHEM-CORRELATION-001"],
+                    nrc_event,
+                    score=60,
+                    priority="MEDIUM",
+                    recommended_level="TL2",
+                    label="CORRELATED_ALERT",
+                    rationale=(
+                        "NRC and PHMSA records share an EPA RMP toxic substance match and identify "
+                        "reports in the same state within three days. Analyst review is required "
+                        "to determine whether the reports describe the same incident."
+                    ),
+                    evidence={
+                        "nrc_report_id": nrc_event.source_record_id,
+                        "phmsa_report_id": phmsa_event.source_record_id,
+                        "state": nrc_state,
+                        "days_apart": abs((nrc_date - phmsa_date).days),
+                        "shared_epa_rmp_toxic_substances": sorted(shared_substances),
+                    },
+                    additional_evidence_events=[phmsa_event],
+                )
+                alert_count += 1
+                correlated_pairs.add(pair)
     run.alert_count = alert_count
     record_audit(db, "DETECTION_RUN_COMPLETED", "detection_run", run.id, metadata={"alerts": alert_count})
     db.commit()
     db.refresh(run)
     return run
+
+
+def _state_code(region: str | None) -> str | None:
+    if not region:
+        return None
+    candidate = region.strip().upper().split(",")[-1].strip()
+    return candidate if len(candidate) == 2 and candidate.isalpha() else None
+
+
+def _date_value(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+def _regulated_substances(event: NormalizedEvent) -> set[str]:
+    commodities = (event.severity_features or {}).get("commodities") or [event.commodity]
+    matches = [substance_result(commodity) for commodity in commodities]
+    return {match[3].regulated_substance for match in matches if match}

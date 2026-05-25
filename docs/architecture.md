@@ -36,4 +36,4 @@ Registered official or approved source
 
 ## Growth Path
 
-Connectors for PHMSA or NRC can replace manual uploads after format verification. WHO DON and CDC NNDSS connectors extend monitoring into BIO. Fraud or another risk domain later adds new event fields and rules while retaining the platform workflow.
+NOAA, PHMSA, and NRC connectors provide CHEM/hazmat source records after format verification. NRC reports are joined across official workbook sheets by `SEQNOS` and can be compared with PHMSA reports for analyst-reviewed correlation. WHO DON and CDC NNDSS connectors can later extend monitoring into BIO. Fraud or another risk domain later adds new event fields and rules while retaining the platform workflow.

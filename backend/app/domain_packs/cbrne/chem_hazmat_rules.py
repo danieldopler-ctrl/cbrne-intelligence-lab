@@ -4,7 +4,7 @@ from app.domain_packs.cbrne.epa_rmp_toxic_substances import (
 )
 
 
-RULE_SET_VERSION = "CHEM_HAZMAT_V0.3"
+RULE_SET_VERSION = "CHEM_HAZMAT_V0.4"
 
 DEFAULT_RULES = [
     {
@@ -47,13 +47,53 @@ DEFAULT_RULES = [
     },
     {
         "rule_id": "CHEM-RELEASE-QUANTITY-001",
-        "title": "Large PHMSA liquid-gallon release quantity",
+        "title": "Large reported liquid-gallon release quantity",
         "rationale": (
-            "Prioritizes PHMSA rows reported in standardized liquid gallons (LGA); "
-            "other units require separate handling."
+            "Prioritizes source-reported liquid quantities expressed in or converted to "
+            "gallons; unsupported units are excluded."
         ),
         "severity": "MEDIUM",
-        "logic_config": {"type": "reported_liquid_release_quantity", "minimum_gallons": 10000, "unit": "LGA"},
+        "logic_config": {"type": "reported_liquid_release_quantity", "minimum_gallons": 10000},
+    },
+    {
+        "rule_id": "CHEM-CONSEQUENCE-COUNT-HIGH-001",
+        "title": "High reported injury count",
+        "rationale": "Prioritizes count-bearing source reports with five or more reported injuries.",
+        "severity": "HIGH",
+        "logic_config": {"type": "reported_count_consequence", "minimum_injuries": 5},
+    },
+    {
+        "rule_id": "CHEM-CONSEQUENCE-COUNT-MODERATE-001",
+        "title": "Reported consequence count",
+        "rationale": "Prioritizes count-bearing source reports with lower injury or evacuation counts.",
+        "severity": "MEDIUM",
+        "logic_config": {
+            "type": "reported_count_consequence",
+            "minimum_injuries": 1,
+            "minimum_evacuations": 1,
+        },
+    },
+    {
+        "rule_id": "CHEM-EVACUATION-LARGE-001",
+        "title": "Large reported evacuation count",
+        "rationale": "Prioritizes count-bearing source reports with 100 or more reported evacuations.",
+        "severity": "HIGH",
+        "logic_config": {"type": "reported_count_consequence", "minimum_evacuations": 100},
+    },
+    {
+        "rule_id": "CHEM-CORRELATION-001",
+        "title": "Cross-source chemical incident proximity",
+        "rationale": (
+            "Prioritizes NRC and PHMSA reports sharing an EPA RMP toxic substance, state, "
+            "and three-day window."
+        ),
+        "severity": "MEDIUM",
+        "logic_config": {
+            "type": "cross_source_proximity",
+            "sources": ["NRC", "PHMSA"],
+            "days": 3,
+            "commodity_basis": "shared_epa_rmp_toxic_substance",
+        },
     },
 ]
 
@@ -90,6 +130,23 @@ def reported_liquid_release_result(gallons: float) -> tuple[int, str, str] | Non
     if gallons >= 10000:
         return 45, "LOW", "TL2"
     return None
+
+
+def count_consequence_results(features: dict[str, object]) -> list[tuple[str, int, str, str]]:
+    if features.get("source_capability") != "count_bearing":
+        return []
+    injuries = int(features.get("injuries_count", 0) or 0)
+    evacuated = int(features.get("evacuations_count", 0) or 0)
+    results: list[tuple[str, int, str, str]] = []
+    if injuries >= 5:
+        results.append(("CHEM-CONSEQUENCE-COUNT-HIGH-001", 75, "HIGH", "TL3"))
+    elif injuries > 0:
+        results.append(("CHEM-CONSEQUENCE-COUNT-MODERATE-001", 50, "MEDIUM", "TL2"))
+    if evacuated >= 100:
+        results.append(("CHEM-EVACUATION-LARGE-001", 75, "HIGH", "TL3"))
+    elif evacuated > 0 and injuries == 0:
+        results.append(("CHEM-CONSEQUENCE-COUNT-MODERATE-001", 50, "MEDIUM", "TL2"))
+    return results
 
 
 def substance_result(commodity: str | None) -> tuple[int, str, str, ToxicSubstanceMatch] | None:

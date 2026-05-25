@@ -1,9 +1,11 @@
 import os
+from io import BytesIO
 
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///./test-cbrne.db"
 os.environ["DATA_DIR"] = "./test-data"
 
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 from app.database import Base, engine
 from app.main import app
@@ -11,6 +13,24 @@ from app.routers import connectors
 
 
 client = TestClient(app)
+
+
+def nrc_fixture_workbook() -> bytes:
+    workbook = Workbook()
+    common = workbook.active
+    common.title = "INCIDENT_COMMONS"
+    common.append(["SEQNOS", "INCIDENT_DATE_TIME", "LOCATION_STATE", "DESCRIPTION_OF_INCIDENT"])
+    common.append(["NRC-TEST-1", "2026-01-08 10:00", "TX", "Safe NRC fixture incident"])
+    details = workbook.create_sheet("INCIDENT_DETAILS")
+    details.append(["SEQNOS", "NUMBER_INJURED", "NUMBER_FATALITIES", "NUMBER_EVACUATED"])
+    details.append(["NRC-TEST-1", 5, 0, 110])
+    material = workbook.create_sheet("MATERIAL_INVOLVED")
+    material.append(["SEQNOS", "NAME_OF_MATERIAL", "AMOUNT_OF_MATERIAL", "UNIT_OF_MEASURE"])
+    material.append(["NRC-TEST-1", "CHLORINE", 12000, "GALLON(S)"])
+    material.append(["NRC-TEST-1", "AMMONIA", 1, "POUND(S)"])
+    stream = BytesIO()
+    workbook.save(stream)
+    return stream.getvalue()
 
 
 def setup_module() -> None:
@@ -135,7 +155,7 @@ def test_noaa_connector_normalizes_official_shape(monkeypatch) -> None:
     assert event["commodity"] == "Chlorine Gas"
     run = client.post("/detections/run", json={"ingest_batch_id": response.json()["ingest_batch_id"]})
     assert run.status_code == 200
-    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.3"
+    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.4"
     assert run.json()["alerts_created"] == 1
     alerts = client.get("/alerts").json()
     assert any("EPA RMP toxic substance commodity match: NOAA-TEST-1" in alert["title"] for alert in alerts)
@@ -171,12 +191,12 @@ def test_phmsa_export_maps_consequences_for_detection() -> None:
     assert "quantity_released_liquid_gallons" not in gas_event["severity_features"]
     run = client.post("/detections/run", json={"ingest_batch_id": imported.json()["ingest_batch_id"]})
     assert run.status_code == 200
-    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.3"
+    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.4"
     assert run.json()["alerts_created"] == 2
     alerts = client.get("/alerts").json()
     consequence = next(alert for alert in alerts if alert["title"] == "Reported consequence severity: PHMSA-TEST-1")
     release = next(
-        alert for alert in alerts if alert["title"] == "Large PHMSA liquid-gallon release quantity: PHMSA-TEST-1"
+        alert for alert in alerts if alert["title"] == "Large reported liquid-gallon release quantity: PHMSA-TEST-1"
     )
     assert consequence["recommended_threat_level"] == "TL2"
     assert release["score"] == 70
@@ -185,4 +205,49 @@ def test_phmsa_export_maps_consequences_for_detection() -> None:
     assert any("NOAA-TEST-1" in alert["title"] for alert in history)
     summary = client.get("/metrics/summary").json()
     assert summary["open_alerts"] == 2
-    assert summary["current_rule_set_version"] == "CHEM_HAZMAT_V0.3"
+    assert summary["current_rule_set_version"] == "CHEM_HAZMAT_V0.4"
+
+
+def test_nrc_workbook_count_rules_and_cross_source_correlation() -> None:
+    phmsa_fixture = (
+        "Incident ID\tDate Of Incident\tIncident City\tIncident State\tCommodity Long Name\t"
+        "Total Hazmat Fatalities\tHazmat Injury Indicator\tSerious Evacuations\tQuantity Released\tUnit Of Measure\t"
+        "Description of Events\n"
+        "PHMSA-NRC-CORR\t2026-01-07\tFixture City\tTX\tChlorine\t0\tNo\tNo\t0\tLGA\t"
+        "Safe correlation fixture\n"
+    )
+    phmsa = client.post(
+        "/connectors/phmsa-hazmat/import",
+        files={"file": ("phmsa-correlation-fixture.txt", phmsa_fixture, "text/plain")},
+    )
+    assert phmsa.status_code == 201
+
+    imported = client.post(
+        "/connectors/nrc/import",
+        files={"file": ("nrc-fixture.xlsx", nrc_fixture_workbook(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert imported.status_code == 201
+    assert imported.json()["mapping_version"] == "nrc-cy-workbook-v1"
+    assert imported.json()["chemical_events"] == 1
+    events = client.get("/events?domain=CHEM").json()
+    event = next(event for event in events if event["source_record_id"] == "NRC-TEST-1")
+    assert event["severity_features"]["injuries_count"] == 5
+    assert event["severity_features"]["evacuations_count"] == 110
+    assert event["severity_features"]["raw_material_row_count"] == 2
+    assert event["severity_features"]["quantity_released_gallons"] == 12000
+
+    run = client.post("/detections/run", json={"ingest_batch_id": imported.json()["ingest_batch_id"]})
+    assert run.status_code == 200
+    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.4"
+    assert run.json()["alerts_created"] == 5
+    alerts = client.get("/alerts").json()
+    titles = {alert["title"] for alert in alerts}
+    assert "High reported injury count: NRC-TEST-1" in titles
+    assert "Large reported evacuation count: NRC-TEST-1" in titles
+    assert "Large reported liquid-gallon release quantity: NRC-TEST-1" in titles
+    assert "EPA RMP toxic substance commodity match: NRC-TEST-1" in titles
+    correlated = next(
+        alert for alert in alerts if alert["title"] == "Cross-source chemical incident proximity: NRC-TEST-1"
+    )
+    assert correlated["result_label"] == "CORRELATED_ALERT"
+    assert correlated["recommended_threat_level"] == "TL2"
