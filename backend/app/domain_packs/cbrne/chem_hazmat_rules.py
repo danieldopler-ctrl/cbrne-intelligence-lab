@@ -4,7 +4,7 @@ from app.domain_packs.cbrne.epa_rmp_toxic_substances import (
 )
 
 
-RULE_SET_VERSION = "CHEM_HAZMAT_V0.2"
+RULE_SET_VERSION = "CHEM_HAZMAT_V0.3"
 
 DEFAULT_RULES = [
     {
@@ -45,15 +45,29 @@ DEFAULT_RULES = [
         "severity": "MEDIUM",
         "logic_config": {"type": "epa_rmp_toxic_substance_match", "reference_table": "40 CFR 68.130 Table 1"},
     },
+    {
+        "rule_id": "CHEM-RELEASE-QUANTITY-001",
+        "title": "Large PHMSA liquid-gallon release quantity",
+        "rationale": (
+            "Prioritizes PHMSA rows reported in standardized liquid gallons (LGA); "
+            "other units require separate handling."
+        ),
+        "severity": "MEDIUM",
+        "logic_config": {"type": "reported_liquid_release_quantity", "minimum_gallons": 10000, "unit": "LGA"},
+    },
 ]
 
 
-def consequence_result(features: dict[str, int]) -> tuple[int, str, str] | None:
-    fatalities = features.get("fatalities", 0)
-    injuries = features.get("injuries", 0)
-    evacuated = features.get("evacuated", 0)
+def consequence_result(features: dict[str, object]) -> tuple[int, str, str] | None:
+    fatalities = int(features.get("fatalities", 0) or 0)
+    injuries = int(features.get("injuries", 0) or 0)
+    evacuated = int(features.get("evacuated", 0) or 0)
     if fatalities > 0:
         return 90, "HIGH", "TL3"
+    if features.get("consequence_basis") == "binary_indicators_with_numeric_fatalities":
+        if injuries > 0 or evacuated > 0:
+            return 50, "MEDIUM", "TL2"
+        return None
     if injuries >= 5 or evacuated >= 25:
         return 75, "HIGH", "TL3"
     if injuries > 0 or evacuated > 0:
@@ -63,6 +77,14 @@ def consequence_result(features: dict[str, int]) -> tuple[int, str, str] | None:
 
 def potential_release_result(features: dict[str, int]) -> tuple[int, str, str] | None:
     gallons = features.get("quantity_released", 0)
+    if gallons >= 100000:
+        return 70, "MEDIUM", "TL2"
+    if gallons >= 10000:
+        return 45, "LOW", "TL2"
+    return None
+
+
+def reported_liquid_release_result(gallons: float) -> tuple[int, str, str] | None:
     if gallons >= 100000:
         return 70, "MEDIUM", "TL2"
     if gallons >= 10000:

@@ -8,6 +8,7 @@ from app.models import (
     Alert,
     AlertEvidence,
     AnalystReview,
+    DetectionRun,
     Indicator,
     NormalizedEvent,
     NotificationAction,
@@ -26,8 +27,19 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
 @router.get("", response_model=list[AlertOut])
-def list_alerts(status: str | None = None, db: Session = Depends(get_db)) -> list[Alert]:
+def list_alerts(
+    status: str | None = None,
+    detection_run_id: int | None = None,
+    include_history: bool = False,
+    db: Session = Depends(get_db),
+) -> list[Alert]:
     query = select(Alert).order_by(Alert.score.desc(), Alert.created_at.desc())
+    if detection_run_id is not None:
+        query = query.where(Alert.detection_run_id == detection_run_id)
+    elif not include_history:
+        latest_run_id = db.scalar(select(DetectionRun.id).order_by(DetectionRun.id.desc()).limit(1))
+        if latest_run_id is not None:
+            query = query.where(Alert.detection_run_id == latest_run_id)
     if status:
         query = query.where(Alert.status == status)
     return list(db.scalars(query).all())

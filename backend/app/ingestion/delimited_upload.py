@@ -55,6 +55,13 @@ def as_int(value: Any) -> int:
         return 0
 
 
+def as_float(value: Any) -> float:
+    try:
+        return float(str(value).replace(",", "")) if value not in (None, "") else 0.0
+    except ValueError:
+        return 0.0
+
+
 def map_severity_features(record: dict[str, Any], fields: dict[str, str]) -> dict[str, int]:
     return {
         feature: as_int(mapped_value(record, fields, feature))

@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { apiGet } from "@/lib/api";
 
-type Metrics = { sources: number; ingest_batches: number; events: number; open_alerts: number };
+type Metrics = {
+  sources: number;
+  ingest_batches: number;
+  events: number;
+  open_alerts: number;
+  current_detection_run_id: number | null;
+  current_rule_set_version: string | null;
+};
 
 export default async function Home() {
   const metrics = await apiGet<Metrics>("/metrics/summary");
@@ -9,7 +16,7 @@ export default async function Home() {
     ["Registered Sources", metrics?.sources ?? "-"],
     ["Ingest Batches", metrics?.ingest_batches ?? "-"],
     ["Normalized Events", metrics?.events ?? "-"],
-    ["Open Alerts", metrics?.open_alerts ?? "-"],
+    ["Current Run Open Alerts", metrics?.open_alerts ?? "-"],
   ];
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
@@ -35,6 +42,12 @@ export default async function Home() {
           </div>
         ))}
       </section>
+      {metrics?.current_detection_run_id && (
+        <p className="mt-3 text-sm text-[#8da2ae]">
+          Current metrics show detection run {metrics.current_detection_run_id} under{" "}
+          {metrics.current_rule_set_version}. Earlier runs remain in audit history.
+        </p>
+      )}
       {!metrics && (
         <p className="mt-4 text-sm text-[#8da2ae]">
           API is not running yet. Start the backend after PostgreSQL setup to populate metrics.

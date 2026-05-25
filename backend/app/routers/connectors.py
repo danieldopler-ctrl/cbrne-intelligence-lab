@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.audit.service import record_audit
 from app.config import settings
 from app.database import get_db
-from app.ingestion.delimited_upload import as_int, hash_bytes, parse_records, raw_record_hash, store_raw_file
+from app.ingestion.delimited_upload import as_float, as_int, hash_bytes, parse_records, raw_record_hash, store_raw_file
 from app.models import IngestBatch, NormalizedEvent, RawRecord, Source
 from app.schemas.api import ConnectorSyncResult
 
@@ -29,13 +29,29 @@ PHMSA_LIMITATIONS = (
     "DOT Form 5800.1 transportation incident records identify source-reported events and "
     "consequences, not malicious intent. Exports may include multiple rows for a single incident "
     "when multiple shippers, commodities, or packages are involved; analysts must check incident "
-    "identity before aggregating alerts or consequences. Released quantity and unit remain in the "
-    "raw record and are not scored as NOAA gallons."
+    "identity before aggregating alerts or consequences. Release quantities are scored only when "
+    "PHMSA supplies standardized liquid gallons (`LGA`); gas cubic feet and solid pounds are "
+    "preserved without gallon conversion."
 )
 
 
 def as_yes_indicator(value: object) -> int:
     return 1 if str(value or "").strip().casefold() == "yes" else 0
+
+
+def phmsa_severity_features(row: dict[str, object]) -> dict[str, object]:
+    unit = str(row.get("Unit Of Measure") or "").strip().upper()
+    features: dict[str, object] = {
+        "fatalities": as_int(row.get("Total Hazmat Fatalities")),
+        "injuries": as_yes_indicator(row.get("Hazmat Injury Indicator")),
+        "evacuated": as_yes_indicator(row.get("Serious Evacuations")),
+        "consequence_basis": "binary_indicators_with_numeric_fatalities",
+        "quantity_released_source": as_float(row.get("Quantity Released")),
+        "quantity_unit": unit,
+    }
+    if unit == "LGA":
+        features["quantity_released_liquid_gallons"] = as_float(row.get("Quantity Released"))
+    return features
 
 
 def get_or_create_noaa_source(db: Session) -> Source:
@@ -60,6 +76,7 @@ def get_or_create_noaa_source(db: Session) -> Source:
 def get_or_create_phmsa_source(db: Session) -> Source:
     source = db.scalar(select(Source).where(Source.name == PHMSA_SOURCE_NAME))
     if source:
+        source.limitations = PHMSA_LIMITATIONS
         return source
     source = Source(
         name=PHMSA_SOURCE_NAME,
@@ -172,6 +189,8 @@ async def import_phmsa_hazmat_export(
         "Total Hazmat Fatalities",
         "Hazmat Injury Indicator",
         "Serious Evacuations",
+        "Quantity Released",
+        "Unit Of Measure",
     }
     if not records or not required_fields.issubset(records[0]):
         raise HTTPException(
@@ -186,7 +205,7 @@ async def import_phmsa_hazmat_export(
         stored_path=str(stored_path),
         sha256=hash_bytes(content),
         record_count=len(records),
-        mapping_version="phmsa-hazmat-export-v2",
+        mapping_version="phmsa-hazmat-export-v3",
         status="NORMALIZED",
     )
     db.add(batch)
@@ -221,11 +240,7 @@ async def import_phmsa_hazmat_export(
                 event_type="hazmat transportation incident",
                 region=location or None,
                 commodity=row.get("Commodity Long Name") or row.get("Commodity Short Name") or None,
-                severity_features={
-                    "fatalities": as_int(row.get("Total Hazmat Fatalities")),
-                    "injuries": as_yes_indicator(row.get("Hazmat Injury Indicator")),
-                    "evacuated": as_yes_indicator(row.get("Serious Evacuations")),
-                },
+                severity_features=phmsa_severity_features(row),
                 narrative=row.get("Description of Events"),
                 source_url=source.url,
                 data_classification="PUBLIC",

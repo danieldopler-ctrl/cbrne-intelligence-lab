@@ -19,7 +19,8 @@ export default async function AlertsPage() {
       <p className="text-sm uppercase tracking-[0.22em] text-[#54b5c4]">Analyst Queue</p>
       <h1 className="mt-3 text-3xl font-semibold">Evidence-linked alerts</h1>
       <p className="mt-3 text-[#9db2bd]">
-        Scores prioritize review. Threat level is confirmed by an analyst and retained in the audit history.
+        This queue shows the latest detection run. Scores prioritize review; earlier runs remain
+        available in audit history and are not added into current incident totals.
       </p>
       <div className="mt-8 overflow-hidden rounded border border-[#20323f]">
         <table className="w-full text-left text-sm">

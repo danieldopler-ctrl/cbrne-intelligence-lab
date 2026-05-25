@@ -135,7 +135,7 @@ def test_noaa_connector_normalizes_official_shape(monkeypatch) -> None:
     assert event["commodity"] == "Chlorine Gas"
     run = client.post("/detections/run", json={"ingest_batch_id": response.json()["ingest_batch_id"]})
     assert run.status_code == 200
-    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.2"
+    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.3"
     assert run.json()["alerts_created"] == 1
     alerts = client.get("/alerts").json()
     assert any("EPA RMP toxic substance commodity match: NOAA-TEST-1" in alert["title"] for alert in alerts)
@@ -144,17 +144,21 @@ def test_noaa_connector_normalizes_official_shape(monkeypatch) -> None:
 def test_phmsa_export_maps_consequences_for_detection() -> None:
     fixture = (
         "Incident ID\tDate Of Incident\tIncident City\tIncident State\tCommodity Long Name\t"
-        "Total Hazmat Fatalities\tHazmat Injury Indicator\tSerious Evacuations\tQuantity Released\t"
+        "Total Hazmat Fatalities\tHazmat Injury Indicator\tSerious Evacuations\tQuantity Released\tUnit Of Measure\t"
         "Description of Events\n"
-        "PHMSA-TEST-1\t2026-01-05\tTest City\tMI\tTest Material\t0\tYes\tYes\t1000000\t"
-        "Safe PHMSA fixture only\n"
+        "PHMSA-TEST-1\t2026-01-05\tTest City\tMI\tTest Material\t0\tYes\tYes\t60000\tLGA\t"
+        "Safe PHMSA fixture line one\n"
+        "PHMSA-TEST-1\t2026-01-05\tTest City\tMI\tTest Material\t0\tYes\tYes\t60000\tLGA\t"
+        "Safe PHMSA duplicate incident line\n"
+        "PHMSA-TEST-GCF\t2026-01-06\tTest City\tMI\tTest Gas\t0\tNo\tNo\t1000000\tGCF\t"
+        "Safe unconverted gas quantity line\n"
     )
     imported = client.post(
         "/connectors/phmsa-hazmat/import",
         files={"file": ("phmsa-fixture.txt", fixture, "text/plain")},
     )
     assert imported.status_code == 201
-    assert imported.json()["mapping_version"] == "phmsa-hazmat-export-v2"
+    assert imported.json()["mapping_version"] == "phmsa-hazmat-export-v3"
     events = client.get("/events?domain=CHEM").json()
     event = next(event for event in events if event["source_record_id"] == "PHMSA-TEST-1")
     assert event["commodity"] == "Test Material"
@@ -162,8 +166,23 @@ def test_phmsa_export_maps_consequences_for_detection() -> None:
     assert event["severity_features"]["fatalities"] == 0
     assert event["severity_features"]["injuries"] == 1
     assert event["severity_features"]["evacuated"] == 1
+    assert event["severity_features"]["quantity_released_liquid_gallons"] == 60000
+    gas_event = next(event for event in events if event["source_record_id"] == "PHMSA-TEST-GCF")
+    assert "quantity_released_liquid_gallons" not in gas_event["severity_features"]
     run = client.post("/detections/run", json={"ingest_batch_id": imported.json()["ingest_batch_id"]})
     assert run.status_code == 200
-    assert run.json()["alerts_created"] == 1
+    assert run.json()["rule_set_version"] == "CHEM_HAZMAT_V0.3"
+    assert run.json()["alerts_created"] == 2
     alerts = client.get("/alerts").json()
-    assert any("Reported consequence severity: PHMSA-TEST-1" in alert["title"] for alert in alerts)
+    consequence = next(alert for alert in alerts if alert["title"] == "Reported consequence severity: PHMSA-TEST-1")
+    release = next(
+        alert for alert in alerts if alert["title"] == "Large PHMSA liquid-gallon release quantity: PHMSA-TEST-1"
+    )
+    assert consequence["recommended_threat_level"] == "TL2"
+    assert release["score"] == 70
+    assert not any("NOAA-TEST-1" in alert["title"] for alert in alerts)
+    history = client.get("/alerts?include_history=true").json()
+    assert any("NOAA-TEST-1" in alert["title"] for alert in history)
+    summary = client.get("/metrics/summary").json()
+    assert summary["open_alerts"] == 2
+    assert summary["current_rule_set_version"] == "CHEM_HAZMAT_V0.3"

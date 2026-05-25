@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, defaultdict
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ from app.domain_packs.cbrne.chem_hazmat_rules import (
     RULE_SET_VERSION,
     consequence_result,
     potential_release_result,
+    reported_liquid_release_result,
     substance_result,
 )
 from app.domain_packs.cbrne.epa_rmp_toxic_substances import EPA_RMP_TOXIC_REFERENCE_URL
@@ -89,29 +90,96 @@ def run_detection(
     db.add(run)
     db.flush()
     alert_count = 0
-    period_regions = Counter(
-        (event.region, event.event_date[:7])
-        for event in events
-        if event.hazard_domain == "CHEM" and event.region and event.event_date and len(event.event_date) >= 7
-    )
-    cluster_alerted: set[tuple[str, str]] = set()
-    for event in events:
-        result = consequence_result(event.severity_features or {})
+    chemical_events = [event for event in events if event.hazard_domain == "CHEM"]
+    incident_groups: dict[str, list[NormalizedEvent]] = defaultdict(list)
+    for event in chemical_events:
+        incident_groups[event.source_record_id].append(event)
+
+    for incident_id, incident_events in incident_groups.items():
+        consequence_features: dict[str, object] = {
+            "fatalities": max(int((event.severity_features or {}).get("fatalities", 0) or 0) for event in incident_events),
+            "injuries": max(int((event.severity_features or {}).get("injuries", 0) or 0) for event in incident_events),
+            "evacuated": max(int((event.severity_features or {}).get("evacuated", 0) or 0) for event in incident_events),
+            "incident_rows_evaluated": len(incident_events),
+        }
+        if any(
+            (event.severity_features or {}).get("consequence_basis")
+            == "binary_indicators_with_numeric_fatalities"
+            for event in incident_events
+        ):
+            consequence_features["consequence_basis"] = "binary_indicators_with_numeric_fatalities"
+        result = consequence_result(consequence_features)
         if result:
             score, priority, level = result
+            basis_note = (
+                " Binary injury or serious-evacuation indicators establish presence only, not counts."
+                if consequence_features.get("consequence_basis") == "binary_indicators_with_numeric_fatalities"
+                else ""
+            )
             create_alert(
                 db,
                 run,
                 rules["CHEM-CONSEQUENCE-001"],
-                event,
+                incident_events[0],
                 score=score,
                 priority=priority,
                 recommended_level=level,
                 label="INDICATOR",
-                rationale="Source-reported consequence fields exceed the documented review threshold.",
-                evidence=event.severity_features,
+                rationale=(
+                    "Source-reported consequence fields exceed the documented review threshold. "
+                    "One alert is created per source incident identifier." + basis_note
+                ),
+                evidence={"incident_id": incident_id, **consequence_features},
             )
             alert_count += 1
+
+    liquid_release_groups: dict[tuple[str, str], list[NormalizedEvent]] = defaultdict(list)
+    for event in chemical_events:
+        features = event.severity_features or {}
+        if features.get("quantity_unit") == "LGA" and features.get("quantity_released_liquid_gallons") is not None:
+            liquid_release_groups[(event.source_record_id, event.commodity or "Unspecified commodity")].append(event)
+    for (incident_id, commodity), release_events in liquid_release_groups.items():
+        liquid_gallons = sum(
+            float((event.severity_features or {}).get("quantity_released_liquid_gallons", 0) or 0)
+            for event in release_events
+        )
+        release_result = reported_liquid_release_result(liquid_gallons)
+        if release_result:
+            score, priority, level = release_result
+            create_alert(
+                db,
+                run,
+                rules["CHEM-RELEASE-QUANTITY-001"],
+                release_events[0],
+                score=score,
+                priority=priority,
+                recommended_level=level,
+                label="INDICATOR",
+                rationale=(
+                    "PHMSA reports a large released quantity in standardized liquid gallons (LGA). "
+                    "Rows are aggregated per incident and commodity; this is not an intent finding."
+                ),
+                evidence={
+                    "incident_id": incident_id,
+                    "commodity": commodity,
+                    "reported_liquid_release_gallons": liquid_gallons,
+                    "quantity_unit": "LGA",
+                    "rows_aggregated": len(release_events),
+                },
+            )
+            alert_count += 1
+
+    period_regions = Counter(
+        (event.region, event.event_date[:7])
+        for event in {
+            event.source_record_id: event
+            for event in chemical_events
+            if event.region and event.event_date and len(event.event_date) >= 7
+        }.values()
+    )
+    cluster_alerted: set[tuple[str, str]] = set()
+    substance_alerted: set[tuple[str, str]] = set()
+    for event in events:
         quantity_result = potential_release_result(event.severity_features or {})
         if event.hazard_domain == "CHEM" and quantity_result:
             score, priority, level = quantity_result
@@ -134,28 +202,32 @@ def run_detection(
         substance_match = substance_result(event.commodity)
         if event.hazard_domain == "CHEM" and substance_match:
             score, priority, level, match = substance_match
-            create_alert(
-                db,
-                run,
-                rules["CHEM-SUBSTANCE-001"],
-                event,
-                score=score,
-                priority=priority,
-                recommended_level=level,
-                label="INDICATOR",
-                rationale=(
-                    "Source commodity text matches an EPA RMP regulated toxic substance. "
-                    "This is a review priority signal, not a finding of intent, quantity, "
-                    "release consequence, or regulatory applicability."
-                ),
-                evidence={
-                    "source_commodity": match.source_commodity,
-                    "epa_rmp_toxic_substance": match.regulated_substance,
-                    "match_method": match.match_method,
-                    "reference": EPA_RMP_TOXIC_REFERENCE_URL,
-                },
-            )
-            alert_count += 1
+            substance_key = (event.source_record_id, match.regulated_substance)
+            if substance_key not in substance_alerted:
+                create_alert(
+                    db,
+                    run,
+                    rules["CHEM-SUBSTANCE-001"],
+                    event,
+                    score=score,
+                    priority=priority,
+                    recommended_level=level,
+                    label="INDICATOR",
+                    rationale=(
+                        "Source commodity text matches an EPA RMP regulated toxic substance. "
+                        "This is a review priority signal, not a finding of intent, quantity, "
+                        "release consequence, or regulatory applicability."
+                    ),
+                    evidence={
+                        "incident_id": event.source_record_id,
+                        "source_commodity": match.source_commodity,
+                        "epa_rmp_toxic_substance": match.regulated_substance,
+                        "match_method": match.match_method,
+                        "reference": EPA_RMP_TOXIC_REFERENCE_URL,
+                    },
+                )
+                alert_count += 1
+                substance_alerted.add(substance_key)
         if include_observations and event.hazard_domain == "CHEM" and "release" in event.event_type.lower():
             create_alert(
                 db,

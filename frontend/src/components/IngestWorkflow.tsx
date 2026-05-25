@@ -152,9 +152,9 @@ export function IngestWorkflow() {
           <p className="mt-2 max-w-4xl text-sm text-[#9db2bd]">
             Import a delimited text export from the PHMSA search tool. The app maps official
             fatality count, injury indicator, serious-evacuation indicator, and commodity fields.
-            Released quantity remains in the
-            raw record until unit conversion is calibrated. An export can include multiple rows
-            for one incident, so analysts must check identity before aggregation.
+            It creates incident-level alerts by report number and evaluates released quantity only
+            when PHMSA reports standardized liquid gallons (LGA). Gas and solid units stay
+            unconverted.
           </p>
           <form className="mt-4 flex flex-wrap items-center gap-3" onSubmit={importPhmsa}>
             <input name="file" type="file" accept=".txt,.tsv,.csv" required />
