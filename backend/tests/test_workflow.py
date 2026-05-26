@@ -338,6 +338,183 @@ def test_ai_misuse_safe_fixture_routes_internal_review_only() -> None:
     assert "Fixture conformance only" in result["claim_limit"]
 
 
+def test_cdc_nndss_connector_scores_only_numeric_unflagged_bio_records(monkeypatch) -> None:
+    records = [
+        {
+            "states": "Test Area",
+            "year": "2026",
+            "week": "20",
+            "label": "Test reported condition",
+            "m1": "11",
+            "m2": "10",
+            "m3": "20",
+            "m4": "18",
+            "sort_order": "1",
+        },
+        {
+            "states": "Test Area",
+            "year": "2026",
+            "week": "20",
+            "label": "Flagged report",
+            "m1": "25",
+            "m1_flag": "NC",
+            "m2": "1",
+            "sort_order": "2",
+        },
+        {
+            "states": "Out of scope",
+            "year": "2025",
+            "week": "19",
+            "label": "Must not import",
+            "m1": "50",
+            "m2": "1",
+            "sort_order": "3",
+        },
+    ]
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> list[dict[str, str]]:
+            return records
+
+    monkeypatch.setattr(connectors.httpx, "get", lambda *args, **kwargs: FakeResponse())
+    imported = client.post("/connectors/cdc-nndss/sync?year=2026&week=20")
+    assert imported.status_code == 201
+    result = imported.json()
+    assert result["records_received"] == 2
+    assert result["bio_events"] == 2
+    assert result["non_scorable_records"] == 1
+    duplicate = client.post("/connectors/cdc-nndss/sync?year=2026&week=20").json()
+    assert duplicate["bio_events"] == 0
+    assert duplicate["duplicate_records"] == 2
+    records[0]["m1"] = "12"
+    records[0]["m3"] = "21"
+    revised = client.post("/connectors/cdc-nndss/sync?year=2026&week=20").json()
+    assert revised["bio_events"] == 1
+    assert revised["revised_records"] == 1
+    assert revised["duplicate_records"] == 1
+    events = client.get("/events?domain=BIO").json()
+    cdc_events = [event for event in events if event["severity_features"].get("source_system") == "CDC_NNDSS"]
+    assert any(event["severity_features"]["scorable"] is False for event in cdc_events)
+    revised_event = next(
+        event for event in cdc_events if event["severity_features"].get("revision_of") is not None
+    )
+    assert revised_event["source_record_id"].startswith(
+        f"{revised_event['severity_features']['revision_of']}-REV-"
+    )
+    assert revised_event["severity_features"]["current_week_count"] == 12
+    run = client.post(
+        "/detections/run",
+        json={"ingest_batch_id": result["ingest_batch_id"], "domain_pack": "CBRNE_BIO"},
+    )
+    assert run.status_code == 200
+    assert run.json()["rule_set_version"] == "BIO_MONITORING_V0.1"
+    assert run.json()["alerts_created"] == 1
+    alert = client.get("/alerts?domain_pack=CBRNE_BIO").json()[0]
+    assert alert["recommended_threat_level"] == "TL1"
+    detail = client.get(f"/alerts/{alert['id']}").json()
+    assert detail["evidence"][0]["hazard_domain"] == "BIO"
+    notification = client.post(
+        f"/alerts/{alert['id']}/notifications",
+        json={
+            "threat_level": "TL2",
+            "route_type": "INTERNAL",
+            "route_name": "Blocked for BIO v0.1",
+            "reporting_assessment": "NOT_APPLICABLE",
+            "rationale": "Must be rejected for a surveillance observation.",
+        },
+    )
+    assert notification.status_code == 409
+    doctrine = client.post(
+        f"/alerts/{alert['id']}/plan-reviews",
+        json={
+            "plan_code": "BIA",
+            "applicability": "NOT_APPLICABLE",
+            "rationale": "Must be rejected for a surveillance observation.",
+            "reviewer": "test_analyst",
+        },
+    )
+    assert doctrine.status_code == 409
+
+
+def test_who_don_connector_creates_only_tl1_official_report_observations(monkeypatch) -> None:
+    payload = {
+        "value": [
+            {
+                "DonId": "WHO-DON-TEST-1",
+                "Title": "Official public health event report",
+                "PublicationDateAndTime": "2026-05-20T10:00:00Z",
+                "ItemDefaultUrl": "https://www.who.int/example/official-report",
+                "Summary": "Public official summary for connector testing.",
+                "Provider": "WHO",
+            },
+            {
+                "DonId": "WHO-DON-TEST-OUT-OF-LIMIT",
+                "Title": "Must not import",
+                "PublicationDateAndTime": "2026-05-19T10:00:00Z",
+                "ItemDefaultUrl": "https://www.who.int/example/not-imported",
+                "Summary": "Must not be imported when limit is one.",
+                "Provider": "WHO",
+            },
+        ]
+    }
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, list[dict[str, str]]]:
+            return payload
+
+    monkeypatch.setattr(connectors.httpx, "get", lambda *args, **kwargs: FakeResponse())
+    imported = client.post("/connectors/who-don/sync?limit=1")
+    assert imported.status_code == 201
+    result = imported.json()
+    assert result["records_received"] == 1
+    assert result["bio_events"] == 1
+    duplicate = client.post("/connectors/who-don/sync?limit=1").json()
+    assert duplicate["bio_events"] == 0
+    assert duplicate["duplicate_records"] == 1
+    run = client.post(
+        "/detections/run",
+        json={"ingest_batch_id": result["ingest_batch_id"], "domain_pack": "CBRNE_BIO"},
+    )
+    assert run.status_code == 200
+    assert run.json()["alerts_created"] == 1
+    alert = client.get("/alerts?domain_pack=CBRNE_BIO").json()[0]
+    assert alert["recommended_threat_level"] == "TL1"
+    assert alert["result_label"] == "OBSERVATION"
+
+
+def test_cdc_nndss_connector_rejects_week_at_import_cap(monkeypatch) -> None:
+    records = [
+        {
+            "states": "Test Area",
+            "year": "2026",
+            "week": "21",
+            "label": "Cap fixture",
+            "m1": "1",
+            "m2": "0",
+            "sort_order": str(index),
+        }
+        for index in range(10000)
+    ]
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> list[dict[str, str]]:
+            return records
+
+    monkeypatch.setattr(connectors.httpx, "get", lambda *args, **kwargs: FakeResponse())
+    response = client.post("/connectors/cdc-nndss/sync?year=2026&week=21")
+    assert response.status_code == 409
+    assert "import cap" in response.json()["detail"]
+
+
 def test_unknown_detection_domain_is_rejected() -> None:
     response = client.post("/detections/run", json={"domain_pack": "UNKNOWN_PACK"})
     assert response.status_code == 422

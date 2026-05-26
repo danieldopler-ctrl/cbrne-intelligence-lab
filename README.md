@@ -16,6 +16,7 @@ Incident monitoring foundation now includes:
 - NRC annual workbook importer with report-level numeric consequence scoring and NRC/PHMSA correlation review alerts.
 - AI Misuse Risk Assessment Module using public-safe abstract evaluation records and separate internal review routing.
 - Evaluation and backtesting workspace linking controlled or analyst-labeled benchmark cases to versioned detection runs and alert evidence.
+- Biological monitoring work in local development using bounded WHO Disease Outbreak News and CDC NNDSS official public-data synchronization.
 
 This build does **not** confirm malicious intent and does **not** automatically notify external agencies. Automated detections are review priorities.
 
@@ -72,8 +73,8 @@ Stage 0 source candidates are official public data:
 | NOAA IncidentNews Raw Incident Data | First direct public-domain CHEM incident connector |
 | PHMSA Hazmat Incident Reports | CHEM/hazmat incident analysis and baselines |
 | National Response Center reports | Environmental release event monitoring |
-| WHO Disease Outbreak News API | BIO report ingestion in a later increment |
-| CDC NNDSS Weekly Data | BIO baseline analysis in a later increment |
+| WHO Disease Outbreak News API | Official BIO report context through bounded API synchronization |
+| CDC NNDSS Weekly Data | Weekly provisional BIO surveillance review indicators |
 
 Raw data files are local-only and excluded from git. Each ingest records source metadata, file hash, mapping version, and limitations. NOAA IncidentNews contains selected incidents where NOAA supported response; it is not a complete inventory and cannot establish malicious intent.
 
@@ -97,6 +98,23 @@ The evaluation workspace measures routing behavior against documented expectatio
 fixture results are labeled `Fixture routing agreement`; they are not model safety performance.
 CHEM reviewed benchmarks require an analyst citation and rationale for selected public-source
 records; they do not establish intent or population-wide threat detection rates.
+
+Stage 6 adds `BIO_MONITORING_V0.1` locally. WHO Disease Outbreak News records are retained as
+official-report observations. CDC NNDSS rows are limited to a selected reporting week, preserve
+source flags, reject a weekly response that reaches the bounded 10,000-row cap, and can create a
+`TL1` review indicator only when a numeric current-week count is
+above CDC's source-published prior 52-week maximum. CDC counts are provisional and may be revised
+or delayed; identical repeated rows are skipped while changed official rows are retained as
+linked source revisions. BIO indicators cannot establish cause, intent, attribution, or emergency status, and
+notification or response-doctrine actions are disabled for this rule version.
+
+Initial local validation imported 20 bounded WHO DON reports and produced 20 `TL1`
+official-report observations. A CDC NNDSS import for MMWR 2026 week 19 retained 8,400 weekly
+rows, excluded 7,438 non-scorable or flagged rows from scoring, and produced 15 `TL1`
+prior-maximum review indicators from 962 scorable rows. These are local rule outputs, not a
+threat prevalence or detection-performance claim. A revision-aware repeat sync of the same
+official week classified all 8,400 rows as identical duplicates, retained zero false revisions,
+and reproduced the 15-indicator result from the canonical import batch.
 
 ## Threat And Escalation Handling
 
@@ -133,8 +151,8 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 | Stage 2 | PHMSA deduplication, calibration, and unit-aware quantity scoring | Complete |
 | Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Complete, pushed at `58c9c25` |
 | Stage 4 | AI Misuse Risk Assessment Module | Complete, pushed at `3bed986` |
-| Stage 5 | Evaluation and backtesting infrastructure | In local development |
-| Stage 6 | WHO/CDC BIO monitoring connectors | Planned |
+| Stage 5 | Evaluation and backtesting infrastructure | Complete, pushed at `f8eba3a` |
+| Stage 6 | WHO/CDC BIO monitoring connectors | In local development |
 | Stage 7 | Reporting and evidence-constrained AI support | Planned |
 | Stage 8 | Domain expansion and deployment decision | Planned |
 

@@ -74,6 +74,11 @@ export default async function Home() {
           <h2 className="mt-2 text-xl font-medium">Evaluation and backtesting</h2>
           <p className="mt-2 text-sm text-[#9db2bd]">Compare versioned routing behavior against documented fixture or benchmark expectations.</p>
         </Link>
+        <Link href="/alerts?domain=bio" className="rounded border border-[#20323f] bg-[#111b23] p-6 hover:border-[#54b5c4]">
+          <p className="text-xs uppercase text-[#54b5c4]">05 / BIO Monitoring</p>
+          <h2 className="mt-2 text-xl font-medium">Outbreak and surveillance review</h2>
+          <p className="mt-2 text-sm text-[#9db2bd]">Review WHO outbreak reports and CDC provisional weekly surveillance indicators.</p>
+        </Link>
       </section>
     </main>
   );

@@ -102,3 +102,46 @@ detection run routed those selected records as documented.
 These selected-case results are not precision, recall, population detection rates, or proof of
 threat intent. Historical detection runs may be compared on the same evaluation set for route and
 workload changes; they are never added together as current alert totals.
+
+## Stage 6 Biological Monitoring Rules
+
+Rule set identifier: `BIO_MONITORING_V0.1`
+
+| Rule | Trigger | Output | Required interpretation |
+|---|---|---|---|
+| `BIO-SURVEILLANCE-ABOVE-PRIOR-MAX-001` | A CDC NNDSS row has usable numeric current-week and prior-52-week-maximum values without disqualifying source flags, and current week is greater than the prior maximum | `INDICATOR`, score 35, recommended `TL1` | Provisional reporting above a source comparison value warrants review; it does not identify cause, deliberate release, or intent |
+| `BIO-OFFICIAL-OUTBREAK-REPORT-001` | A WHO Disease Outbreak News record is imported from the official API resource | `OBSERVATION`, score 20, recommended `TL1` | Official public-health report available for context; it is not a threat finding or attribution |
+
+CDC NNDSS rows are imported only through bounded year/week synchronization. A response that reaches
+the 10,000-row weekly import cap is rejected rather than processed as an incomplete week. Missing, nonnumeric,
+or flagged comparison values remain linked evidence but are excluded from the CDC rule. CDC
+weekly data is provisional and subject to later revision and reporting delay. Re-syncing an
+identical row creates no new event, while a changed official payload for the same source-row
+identity is retained as a linked revision event so later source corrections are not discarded.
+
+WHO DON synchronization uses `GET /api/news/diseaseoutbreaknews`; the similarly named
+`/api/news/outbreaks` resource is not the DON source selected after live interface validation.
+Automated text interpretation and CDC/WHO correlation are excluded until a documented matching
+method can be validated against imported records.
+
+`BIO_MONITORING_V0.1` cannot automatically create `TL3` or `TL4`, notification actions, or
+response-doctrine records. Any future escalation capability requires separate evidence,
+calibration, and review.
+
+### Initial BIO Validation Result
+
+On May 25, 2026, a bounded CDC NNDSS import for MMWR 2026 week 19 returned 8,400 aggregate
+rows. Of those, 962 contained usable numeric comparison values without disqualifying source
+flags; 7,438 were retained as evidence but excluded from scoring. The CDC rule generated 15
+`TL1` review indicators. This volume is manageable for review in the initial local exercise, but
+it is not a performance measure or an indication of deliberate activity.
+
+A bounded WHO DON import of the latest 20 official records generated 20 `TL1` official-report
+observations. No CDC/WHO correlation rule is implemented in this version because matching
+condition, geography, and time fields has not been validated.
+
+After revision-aware CDC handling was added, a repeat sync of MMWR 2026 week 19 classified all
+8,400 re-retrieved rows as identical duplicates, produced zero revision records, and a detection
+rerun against the canonical imported batch reproduced 15 `TL1` indicators. Automated tests also
+cover the changed-payload path and require an official changed row to be retained as a linked
+revision rather than discarded as a duplicate.

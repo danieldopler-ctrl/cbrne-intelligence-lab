@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.detection.ai_misuse_engine import run_ai_misuse_detection
+from app.detection.bio_engine import run_bio_detection
 from app.detection.engine import run_detection
 from app.schemas.api import DetectionRequest, DetectionResult
 
@@ -14,6 +15,8 @@ router = APIRouter(prefix="/detections", tags=["detections"])
 def execute_detection(payload: DetectionRequest, db: Session = Depends(get_db)) -> DetectionResult:
     if payload.domain_pack == "AI_MISUSE":
         run = run_ai_misuse_detection(db, payload.ingest_batch_id)
+    elif payload.domain_pack == "CBRNE_BIO":
+        run = run_bio_detection(db, payload.ingest_batch_id)
     else:
         run = run_detection(db, payload.ingest_batch_id, include_observations=payload.include_observations)
     return DetectionResult(

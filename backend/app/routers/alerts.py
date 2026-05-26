@@ -26,6 +26,18 @@ from app.schemas.api import (
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
 
+def alert_has_bio_evidence(db: Session, alert_id: int) -> bool:
+    return (
+        db.scalar(
+            select(AlertEvidence.id)
+            .join(NormalizedEvent, AlertEvidence.event_id == NormalizedEvent.id)
+            .where(AlertEvidence.alert_id == alert_id, NormalizedEvent.hazard_domain == "BIO")
+            .limit(1)
+        )
+        is not None
+    )
+
+
 @router.get("", response_model=list[AlertOut])
 def list_alerts(
     status: str | None = None,
@@ -77,6 +89,7 @@ def get_alert(alert_id: int, db: Session = Depends(get_db)) -> AlertDetail:
             {
                 "event_id": event.id,
                 "source_record_id": event.source_record_id,
+                "hazard_domain": event.hazard_domain,
                 "event_type": event.event_type,
                 "region": event.region,
                 "source_url": event.source_url,
@@ -182,6 +195,14 @@ def add_notification(
             status_code=409,
             detail="AI misuse fixture alerts use internal safety review only; notification actions are disabled.",
         )
+    if alert_has_bio_evidence(db, alert_id):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "BIO_MONITORING_V0.1 alerts are source-derived observation indicators; "
+                "notification actions are disabled in this rule version."
+            ),
+        )
     action = NotificationAction(alert_id=alert_id, **payload.model_dump())
     db.add(action)
     db.flush()
@@ -201,6 +222,14 @@ def add_plan_review(
         raise HTTPException(
             status_code=409,
             detail="AI misuse fixture alerts are not incident records; doctrine review is disabled.",
+        )
+    if alert_has_bio_evidence(db, alert_id):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "BIO_MONITORING_V0.1 alerts do not activate or assess response doctrine; "
+                "doctrine review is disabled in this rule version."
+            ),
         )
     review = PlanApplicabilityReview(alert_id=alert_id, **payload.model_dump())
     db.add(review)

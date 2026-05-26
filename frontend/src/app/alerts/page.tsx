@@ -16,7 +16,7 @@ type Alert = {
 
 export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ domain?: string }> }) {
   const { domain } = await searchParams;
-  const domainPack = domain === "misuse" ? "AI_MISUSE" : domain === "chem" ? "CBRNE_CHEM" : null;
+  const domainPack = domain === "misuse" ? "AI_MISUSE" : domain === "bio" ? "CBRNE_BIO" : domain === "chem" ? "CBRNE_CHEM" : null;
   const query = domainPack ? `/alerts?domain_pack=${domainPack}` : "/alerts";
   const alerts = (await apiGet<Alert[]>(query)) ?? [];
   return (
@@ -30,6 +30,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
       <nav className="mt-5 flex gap-3 text-sm">
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts">Latest run</Link>
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=chem">CHEM incidents</Link>
+        <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=bio">BIO monitoring</Link>
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=misuse">AI misuse review</Link>
       </nav>
       <div className="mt-8 overflow-hidden rounded border border-[#20323f]">

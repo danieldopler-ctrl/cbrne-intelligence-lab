@@ -59,6 +59,19 @@ class ConnectorSyncResult(BaseModel):
     mapping_version: str
 
 
+class BioConnectorSyncResult(BaseModel):
+    source_id: int
+    ingest_batch_id: int
+    records_received: int
+    bio_events: int
+    duplicate_records: int
+    revised_records: int = 0
+    non_scorable_records: int = 0
+    sha256: str
+    mapping_version: str
+    limitation: str
+
+
 class EventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -77,7 +90,7 @@ class EventOut(BaseModel):
 
 class DetectionRequest(BaseModel):
     ingest_batch_id: int | None = None
-    domain_pack: Literal["CBRNE_CHEM", "AI_MISUSE"] = "CBRNE_CHEM"
+    domain_pack: Literal["CBRNE_CHEM", "CBRNE_BIO", "AI_MISUSE"] = "CBRNE_CHEM"
     include_observations: bool = False
 
 

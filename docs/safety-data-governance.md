@@ -23,6 +23,7 @@ The platform supports defensive analysis of approved source records. It must not
 - Public repository review is required before publishing any data or outputs.
 - AI misuse fixture descriptions must be safe for unrestricted public reading and remain at the behavioral-category level.
 - AI misuse fixture alerts are restricted to internal safety review and cannot create notification or incident-doctrine actions.
+- BIO monitoring uses public aggregate or official report data only; its v0.1 observation indicators cannot create notification or incident-doctrine actions.
 
 ## Prohibited System Outputs
 
@@ -39,3 +40,11 @@ workflow behavior, not a model's response to a harmful request. Case summaries o
 hazardous materials, quantities, acquisition pathways, delivery methods, and evasion
 instructions. Output levels are `MR0` to `MR3` internal review routes and are never interpreted as
 incident `TL` levels.
+
+## Biological Monitoring Control
+
+`BIO_MONITORING_V0.1` uses bounded synchronization of WHO Disease Outbreak News records and CDC
+NNDSS weekly aggregate provisional reports. CDC source flags and missing comparison values are
+retained rather than converted into detections. Automated BIO output is limited to `TL1`
+analyst-review indicators in this version and cannot be used as a finding of cause, deliberate
+release, intent, attribution, or emergency-plan applicability.

@@ -3,7 +3,15 @@
 import { FormEvent, useState } from "react";
 import { API_BASE } from "@/lib/api";
 
-export function AlertReviewPanel({ alertId, reviewFramework }: { alertId: number; reviewFramework: string }) {
+export function AlertReviewPanel({
+  alertId,
+  reviewFramework,
+  isBioObservation = false,
+}: {
+  alertId: number;
+  reviewFramework: string;
+  isBioObservation?: boolean;
+}) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const isMisuseReview = reviewFramework === "AI_MISUSE_REVIEW";
@@ -77,7 +85,7 @@ export function AlertReviewPanel({ alertId, reviewFramework }: { alertId: number
           <button disabled={busy} type="submit">Record Review</button>
         </div>
       </form>
-      {!isMisuseReview && <form onSubmit={submitPlan} className="rounded border border-[#20323f] bg-[#111b23] p-6">
+      {!isMisuseReview && !isBioObservation && <form onSubmit={submitPlan} className="rounded border border-[#20323f] bg-[#111b23] p-6">
         <h2 className="text-xl font-medium">Response doctrine review</h2>
         <p className="mt-2 text-sm text-[#9db2bd]">
           Potential applicability is not agency activation. Use verified status only with a documented reference.
@@ -104,7 +112,7 @@ export function AlertReviewPanel({ alertId, reviewFramework }: { alertId: number
           <button disabled={busy} type="submit">Record Plan Review</button>
         </div>
       </form>}
-      {!isMisuseReview && <form onSubmit={submitNotification} className="rounded border border-[#20323f] bg-[#111b23] p-6 lg:col-span-2">
+      {!isMisuseReview && !isBioObservation && <form onSubmit={submitNotification} className="rounded border border-[#20323f] bg-[#111b23] p-6 lg:col-span-2">
         <h2 className="text-xl font-medium">Notification assessment</h2>
         <p className="mt-2 text-sm text-[#9db2bd]">
           This records a decision or completed contact. The platform does not send notifications.
@@ -134,6 +142,15 @@ export function AlertReviewPanel({ alertId, reviewFramework }: { alertId: number
           <h2 className="text-xl font-medium">Internal safety review only</h2>
           <p className="mt-3 text-sm text-[#9db2bd]">
             External notification and response-doctrine actions are disabled for synthetic AI misuse evaluation cases.
+          </p>
+        </div>
+      )}
+      {isBioObservation && (
+        <div className="rounded border border-[#294552] bg-[#101d24] p-6">
+          <h2 className="text-xl font-medium">Surveillance review only</h2>
+          <p className="mt-3 text-sm text-[#9db2bd]">
+            BIO_MONITORING_V0.1 indicators use public official reporting for analyst review.
+            Notification and response-doctrine actions are disabled in this rule version.
           </p>
         </div>
       )}

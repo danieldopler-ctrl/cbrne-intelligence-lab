@@ -23,6 +23,7 @@ const initialMapping = JSON.stringify(
 export function IngestWorkflow() {
   const [sourceId, setSourceId] = useState<number | null>(null);
   const [batchId, setBatchId] = useState<number | null>(null);
+  const [bioBatchId, setBioBatchId] = useState<number | null>(null);
   const [mapping, setMapping] = useState(initialMapping);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -156,6 +157,70 @@ export function IngestWorkflow() {
     }
   }
 
+  async function syncCdcNndss(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const form = new FormData(event.currentTarget);
+      const year = form.get("year");
+      const week = form.get("week");
+      const response = await fetch(`${API_BASE}/connectors/cdc-nndss/sync?year=${year}&week=${week}`, {
+        method: "POST",
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail ?? "CDC NNDSS sync failed.");
+      setBioBatchId(result.ingest_batch_id);
+      setMessage(
+        `CDC NNDSS batch ${result.ingest_batch_id} stored: ${result.records_received} weekly rows, ${result.bio_events} new BIO records (${result.revised_records} revised source rows), ${result.non_scorable_records} non-scorable rows. Counts are provisional.`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "CDC NNDSS sync failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function syncWhoDon(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    try {
+      const form = new FormData(event.currentTarget);
+      const limit = form.get("limit");
+      const response = await fetch(`${API_BASE}/connectors/who-don/sync?limit=${limit}`, { method: "POST" });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail ?? "WHO DON sync failed.");
+      setBioBatchId(result.ingest_batch_id);
+      setMessage(
+        `WHO DON batch ${result.ingest_batch_id} stored: ${result.records_received} official reports, ${result.bio_events} new BIO records. Reports provide public-health context only.`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "WHO DON sync failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runBioRules() {
+    if (!bioBatchId) return setMessage("Sync a biological monitoring source before running BIO rules.");
+    setBusy(true);
+    try {
+      const response = await fetch(`${API_BASE}/detections/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingest_batch_id: bioBatchId, domain_pack: "CBRNE_BIO" }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.detail ?? "BIO detection failed.");
+      setMessage(
+        `${result.alerts_created} BIO monitoring review indicators created under ${result.rule_set_version}. These indicators do not establish cause or intent.`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "BIO detection failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <section className="rounded border border-[#294552] bg-[#101d24] p-6 lg:col-span-2">
@@ -182,6 +247,29 @@ export function IngestWorkflow() {
           <form className="mt-4 flex flex-wrap items-center gap-3" onSubmit={importPhmsa}>
             <input name="file" type="file" accept=".txt,.tsv,.csv" required />
             <button disabled={busy} type="submit">Import PHMSA Export</button>
+          </form>
+        </div>
+        <div className="mt-7 border-t border-[#294552] pt-5">
+          <p className="text-xs uppercase tracking-wide text-[#54b5c4]">Biological Monitoring</p>
+          <h3 className="mt-2 text-lg font-medium">CDC NNDSS weekly provisional data</h3>
+          <p className="mt-2 max-w-4xl text-sm text-[#9db2bd]">
+            Sync one reporting week of official aggregate surveillance data. Weekly counts can change
+            as reporting is revised or delayed; review indicators do not identify cause or intent.
+          </p>
+          <form className="mt-4 flex flex-wrap items-center gap-3" onSubmit={syncCdcNndss}>
+            <input name="year" type="number" min="2014" max="2100" defaultValue="2026" required />
+            <input name="week" type="number" min="1" max="53" defaultValue="19" required />
+            <button disabled={busy} type="submit">Sync CDC Reporting Week</button>
+          </form>
+          <h3 className="mt-6 text-lg font-medium">WHO Disease Outbreak News</h3>
+          <p className="mt-2 max-w-4xl text-sm text-[#9db2bd]">
+            Sync a bounded set of official public outbreak reports for analyst context. A report is
+            not evidence of deliberate release or attribution.
+          </p>
+          <form className="mt-4 flex flex-wrap items-center gap-3" onSubmit={syncWhoDon}>
+            <input name="limit" type="number" min="1" max="100" defaultValue="20" required />
+            <button disabled={busy} type="submit">Sync WHO DON Reports</button>
+            <button disabled={busy || !bioBatchId} type="button" onClick={runBioRules}>Run BIO Rules On Current Batch</button>
           </form>
         </div>
         <div className="mt-7 border-t border-[#294552] pt-5">
