@@ -69,6 +69,11 @@ export default async function Home() {
           <h2 className="mt-2 text-xl font-medium">AI misuse assessment queue</h2>
           <p className="mt-2 text-sm text-[#9db2bd]">Review abstract evaluation signals under the separate MR routing framework.</p>
         </Link>
+        <Link href="/evaluations" className="rounded border border-[#20323f] bg-[#111b23] p-6 hover:border-[#54b5c4]">
+          <p className="text-xs uppercase text-[#54b5c4]">04 / Evaluate</p>
+          <h2 className="mt-2 text-xl font-medium">Evaluation and backtesting</h2>
+          <p className="mt-2 text-sm text-[#9db2bd]">Compare versioned routing behavior against documented fixture or benchmark expectations.</p>
+        </Link>
       </section>
     </main>
   );

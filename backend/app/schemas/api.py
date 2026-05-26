@@ -160,3 +160,30 @@ class PlanReviewCreate(BaseModel):
         "NOT_VERIFIED"
     )
     incident_reference: str | None = None
+
+
+class EvaluationSetCreate(BaseModel):
+    name: str
+    version: str
+    domain_pack: Literal["CBRNE_CHEM", "AI_MISUSE"]
+    review_framework: Literal["THREAT_LEVEL", "AI_MISUSE_REVIEW"]
+    evaluation_type: Literal["FIXTURE_CONFORMANCE", "REVIEWED_BENCHMARK"]
+    description: str
+    source_basis: str
+    claim_limit: str
+    status: Literal["DRAFT", "READY", "ARCHIVED"] = "DRAFT"
+
+
+class EvaluationCaseCreate(BaseModel):
+    normalized_event_id: int
+    case_key: str
+    expected_review_level: str
+    expected_rule_ids: list[str] = Field(default_factory=list)
+    label_rationale: str
+    citation: str
+    label_status: Literal["ANALYST_REVIEWED", "DRAFT"] = "ANALYST_REVIEWED"
+
+
+class EvaluationRunCreate(BaseModel):
+    evaluation_set_id: int
+    detection_run_id: int

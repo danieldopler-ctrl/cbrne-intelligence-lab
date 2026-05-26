@@ -11,7 +11,8 @@ Registered official or approved source
   -> indicators and alerts with linked source evidence
   -> analyst review and threat-level confirmation
   -> notification and response-doctrine audit workflow
-  -> evaluation and reviewed reporting (later stage)
+  -> evaluation runs linked to rule versions, evidence, and analyst labels
+  -> reviewed reporting (later stage)
 ```
 
 ## Separation Of Concerns
@@ -34,6 +35,17 @@ Registered official or approved source
 | Review | Alert disposition, threat level, notification assessment, plan mapping |
 | Interface | Next.js operational dashboard |
 
+## Evaluation Workspace
+
+Stage 5 adds persistent evaluation sets, cases, runs, and case results. Evaluation cases reference
+existing normalized events; evaluation runs reference existing detection runs and alert evidence.
+This preserves provenance while preventing selected-case results from being presented as new
+incident detections.
+
+The workspace supports safe fixture conformance for `AI_MISUSE` and analyst-labeled reviewed
+benchmarks for `CBRNE_CHEM`. It compares compatible runs without adding historical alerts into
+current operational totals.
+
 ## AI Misuse Assessment Boundary
 
 The `AI_MISUSE` pack reuses provenance, alerts, review, evaluation, and audit storage, while
@@ -43,7 +55,7 @@ external notification or response-doctrine actions.
 
 ## Growth Path
 
-NOAA, PHMSA, and NRC connectors provide CHEM/hazmat source records after format verification. NRC reports are joined across official workbook sheets by `SEQNOS` and can be compared with PHMSA reports for analyst-reviewed correlation. WHO DON and CDC NNDSS connectors can later extend monitoring into BIO. Fraud or another risk domain later adds new event fields and rules while retaining the platform workflow.
+NOAA, PHMSA, and NRC connectors provide CHEM/hazmat source records after format verification. NRC reports are joined across official workbook sheets by `SEQNOS` and can be compared with PHMSA reports for analyst-reviewed correlation. Evaluation and backtesting are implemented before new BIO source coverage. WHO DON and CDC NNDSS connectors can later extend monitoring into BIO. Fraud or another risk domain later adds new event fields and rules while retaining the platform workflow.
 
 The AI Misuse Risk Assessment Module is implemented before BIO expansion as a controlled safety
 analysis increment relevant to AI safety investigation. It is not a live model testing system.

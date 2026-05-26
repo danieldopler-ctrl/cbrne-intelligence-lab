@@ -70,6 +70,13 @@ evaluated under `AI_MISUSE_V0.1`:
 Several cases correctly trigger more than one rule, so alert count is greater than alerted-case
 count. These are fixture-conformance results only.
 
+## Shared Evaluation Workspace
+
+Stage 5 registers this same safe fixture as a persistent `FIXTURE_CONFORMANCE` evaluation set and
+links its case-level results to a specific `AI_MISUSE_V0.1` detection run. The evaluation page
+labels the match result `Fixture routing agreement`, not accuracy, and retains the existing claim
+limit that the records do not measure real-world model safety performance.
+
 ## Public References
 
 - NIST AI 600-1, Generative Artificial Intelligence Profile: https://doi.org/10.6028/NIST.AI.600-1

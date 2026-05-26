@@ -91,3 +91,14 @@ Before operational credibility claims:
 5. Adjust rules only through a version change with rationale.
 
 The first scoring thresholds are review-prioritization defaults and must be calibrated against real mapped source records.
+
+## Stage 5 Evaluation Workspace
+
+`CHEM_HAZMAT_V0.4` remains unchanged in Stage 5. The evaluation workspace can record selected
+official/public CHEM events as reviewed benchmark cases only when an analyst supplies an expected
+route, rationale, and citation. An evaluation result then identifies whether the existing versioned
+detection run routed those selected records as documented.
+
+These selected-case results are not precision, recall, population detection rates, or proof of
+threat intent. Historical detection runs may be compared on the same evaluation set for route and
+workload changes; they are never added together as current alert totals.

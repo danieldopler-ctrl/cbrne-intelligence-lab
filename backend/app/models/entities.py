@@ -94,6 +94,63 @@ class DetectionRun(Base):
     alert_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class EvaluationSet(Base):
+    __tablename__ = "evaluation_sets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    version: Mapped[str] = mapped_column(String(50))
+    domain_pack: Mapped[str] = mapped_column(String(50))
+    review_framework: Mapped[str] = mapped_column(String(30))
+    evaluation_type: Mapped[str] = mapped_column(String(40))
+    description: Mapped[str] = mapped_column(Text)
+    source_basis: Mapped[str] = mapped_column(Text)
+    claim_limit: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(20), default="DRAFT")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EvaluationCase(Base):
+    __tablename__ = "evaluation_cases"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    evaluation_set_id: Mapped[int] = mapped_column(ForeignKey("evaluation_sets.id"))
+    case_key: Mapped[str] = mapped_column(String(100))
+    normalized_event_id: Mapped[int | None] = mapped_column(ForeignKey("normalized_events.id"))
+    source_record_id: Mapped[str] = mapped_column(String(255))
+    expected_review_level: Mapped[str] = mapped_column(String(10))
+    expected_rule_ids: Mapped[list] = mapped_column(JSON, default=list)
+    label_rationale: Mapped[str] = mapped_column(Text)
+    citation: Mapped[str | None] = mapped_column(Text)
+    label_status: Mapped[str] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EvaluationRun(Base):
+    __tablename__ = "evaluation_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    evaluation_set_id: Mapped[int] = mapped_column(ForeignKey("evaluation_sets.id"))
+    detection_run_id: Mapped[int] = mapped_column(ForeignKey("detection_runs.id"))
+    rule_set_version: Mapped[str] = mapped_column(String(30))
+    evaluation_type: Mapped[str] = mapped_column(String(40))
+    case_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EvaluationCaseResult(Base):
+    __tablename__ = "evaluation_case_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    evaluation_run_id: Mapped[int] = mapped_column(ForeignKey("evaluation_runs.id"))
+    evaluation_case_id: Mapped[int] = mapped_column(ForeignKey("evaluation_cases.id"))
+    generated_review_level: Mapped[str] = mapped_column(String(10))
+    generated_rule_ids: Mapped[list] = mapped_column(JSON, default=list)
+    alert_ids: Mapped[list] = mapped_column(JSON, default=list)
+    result: Mapped[str] = mapped_column(String(40))
+    result_rationale: Mapped[str] = mapped_column(Text)
+
+
 class Indicator(Base):
     __tablename__ = "indicators"
 

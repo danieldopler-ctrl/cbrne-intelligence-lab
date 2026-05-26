@@ -10,6 +10,7 @@ export function NavBar() {
         <nav className="flex gap-6 text-sm text-[#a9bfca]">
           <Link href="/sources" className="hover:text-white">Sources & Ingest</Link>
           <Link href="/alerts" className="hover:text-white">Alerts</Link>
+          <Link href="/evaluations" className="hover:text-white">Evaluations</Link>
         </nav>
       </div>
     </header>

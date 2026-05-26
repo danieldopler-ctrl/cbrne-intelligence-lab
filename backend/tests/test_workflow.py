@@ -341,3 +341,161 @@ def test_ai_misuse_safe_fixture_routes_internal_review_only() -> None:
 def test_unknown_detection_domain_is_rejected() -> None:
     response = client.post("/detections/run", json={"domain_pack": "UNKNOWN_PACK"})
     assert response.status_code == 422
+
+
+def test_shared_evaluation_workspace_reproduces_ai_misuse_fixture_conformance() -> None:
+    imported = client.post("/ai-misuse/import-safe-evaluation")
+    run = client.post(
+        "/detections/run",
+        json={"ingest_batch_id": imported.json()["ingest_batch_id"], "domain_pack": "AI_MISUSE"},
+    )
+    registered = client.post("/evaluations/register-ai-misuse-fixture")
+    assert registered.status_code == 201
+    evaluation = client.post(
+        "/evaluations/run",
+        json={
+            "evaluation_set_id": registered.json()["evaluation_set_id"],
+            "detection_run_id": run.json()["detection_run_id"],
+        },
+    )
+    assert evaluation.status_code == 201
+    detail = client.get(f"/evaluations/runs/{evaluation.json()['evaluation_run_id']}")
+    assert detail.status_code == 200
+    report = detail.json()
+    assert report["evaluation_set"]["evaluation_type"] == "FIXTURE_CONFORMANCE"
+    assert report["measures"]["cases_in_set"] == 34
+    assert report["measures"]["cases_evaluated"] == 34
+    assert report["measures"]["matched_routes"] == 34
+    assert report["measures"]["missed_expected_priorities"] == 0
+    assert report["measures"]["unexpected_high_priorities"] == 0
+    assert "not real-world model safety" in report["claim_limit"]
+    assert all(result["result"] == "MATCH" for result in report["case_results"])
+
+
+def test_chem_benchmark_evaluation_links_alerts_and_rejects_wrong_domain() -> None:
+    fixture = (
+        "Incident ID\tDate Of Incident\tIncident City\tIncident State\tCommodity Long Name\t"
+        "Total Hazmat Fatalities\tHazmat Injury Indicator\tSerious Evacuations\tQuantity Released\tUnit Of Measure\t"
+        "Description of Events\n"
+        "PHMSA-EVAL-1\t2026-01-09\tTest City\tMI\tTest Material\t0\tYes\tNo\t0\tLGA\t"
+        "Safe benchmark fixture record\n"
+    )
+    imported = client.post(
+        "/connectors/phmsa-hazmat/import",
+        files={"file": ("phmsa-evaluation-fixture.txt", fixture, "text/plain")},
+    )
+    run = client.post("/detections/run", json={"ingest_batch_id": imported.json()["ingest_batch_id"]})
+    event = next(
+        item for item in client.get("/events?domain=CHEM").json() if item["source_record_id"] == "PHMSA-EVAL-1"
+    )
+    evaluation_set = client.post(
+        "/evaluations/sets",
+        json={
+            "name": "Safe CHEM Benchmark Test",
+            "version": "CHEM_REVIEWED_BENCHMARK_TEST_V0.1",
+            "domain_pack": "CBRNE_CHEM",
+            "review_framework": "THREAT_LEVEL",
+            "evaluation_type": "REVIEWED_BENCHMARK",
+            "description": "Test-only benchmark set.",
+            "source_basis": "Safe automated fixture.",
+            "claim_limit": "Selected test records only; no operational-performance claim.",
+            "status": "READY",
+        },
+    )
+    assert evaluation_set.status_code == 201
+    set_id = evaluation_set.json()["evaluation_set_id"]
+    case = client.post(
+        f"/evaluations/sets/{set_id}/cases",
+        json={
+            "normalized_event_id": event["id"],
+            "case_key": "CHEM-TEST-1",
+            "expected_review_level": "TL2",
+            "expected_rule_ids": ["CHEM-CONSEQUENCE-001"],
+            "label_rationale": "Safe fixture includes a reported injury indicator.",
+            "citation": "Safe test fixture record PHMSA-EVAL-1.",
+            "label_status": "ANALYST_REVIEWED",
+        },
+    )
+    assert case.status_code == 201
+    evaluated = client.post(
+        "/evaluations/run",
+        json={"evaluation_set_id": set_id, "detection_run_id": run.json()["detection_run_id"]},
+    )
+    detail = client.get(f"/evaluations/runs/{evaluated.json()['evaluation_run_id']}").json()
+    assert detail["measures"]["matched_routes"] == 1
+    assert detail["case_results"][0]["alert_ids"]
+    assert "CHEM-CONSEQUENCE-001" in detail["case_results"][0]["generated_rule_ids"]
+
+    misuse_import = client.post("/ai-misuse/import-safe-evaluation")
+    misuse_run = client.post(
+        "/detections/run",
+        json={"ingest_batch_id": misuse_import.json()["ingest_batch_id"], "domain_pack": "AI_MISUSE"},
+    )
+    wrong_run = client.post(
+        "/evaluations/run",
+        json={"evaluation_set_id": set_id, "detection_run_id": misuse_run.json()["detection_run_id"]},
+    )
+    assert wrong_run.status_code == 409
+    misuse_event = client.get("/events?domain=AI_MISUSE&limit=1").json()[0]
+    wrong_case = client.post(
+        f"/evaluations/sets/{set_id}/cases",
+        json={
+            "normalized_event_id": misuse_event["id"],
+            "case_key": "WRONG-DOMAIN",
+            "expected_review_level": "TL2",
+            "label_rationale": "Must be rejected.",
+            "citation": "Must be rejected.",
+        },
+    )
+    assert wrong_case.status_code == 409
+
+
+def test_evaluation_comparison_requires_same_set() -> None:
+    sets = client.get("/evaluations/sets").json()
+    chem_set_id = next(item["id"] for item in sets if item["domain_pack"] == "CBRNE_CHEM")
+    fixture_set_id = next(item["id"] for item in sets if item["domain_pack"] == "AI_MISUSE")
+    chem_event = next(
+        item for item in client.get("/events?domain=CHEM").json() if item["source_record_id"] == "PHMSA-EVAL-1"
+    )
+    second_run = client.post("/detections/run", json={"ingest_batch_id": chem_event["ingest_batch_id"]})
+    second_evaluation = client.post(
+        "/evaluations/run",
+        json={"evaluation_set_id": chem_set_id, "detection_run_id": second_run.json()["detection_run_id"]},
+    ).json()
+    latest = next(item for item in client.get("/evaluations/sets").json() if item["id"] == chem_set_id)
+    assert latest["latest_evaluation_run_id"] == second_evaluation["evaluation_run_id"]
+    chem_runs = client.get(f"/evaluations/sets/{chem_set_id}/runs").json()
+    assert len(chem_runs) == 2
+    compatible = client.get(
+        "/evaluations/compare",
+        params={
+            "baseline_evaluation_run_id": chem_runs[1]["id"],
+            "candidate_evaluation_run_id": chem_runs[0]["id"],
+        },
+    )
+    assert compatible.status_code == 200
+    assert compatible.json()["routes_changed"] == []
+
+    fixture_import = client.post("/ai-misuse/import-safe-evaluation")
+    fixture_detection = client.post(
+        "/detections/run",
+        json={"ingest_batch_id": fixture_import.json()["ingest_batch_id"], "domain_pack": "AI_MISUSE"},
+    )
+    fixture_evaluation = client.post(
+        "/evaluations/run",
+        json={"evaluation_set_id": fixture_set_id, "detection_run_id": fixture_detection.json()["detection_run_id"]},
+    ).json()
+    repeated_fixture_detail = client.get(
+        f"/evaluations/runs/{fixture_evaluation['evaluation_run_id']}"
+    ).json()
+    assert repeated_fixture_detail["measures"]["cases_evaluated"] == 34
+    assert repeated_fixture_detail["measures"]["matched_routes"] == 34
+    assert client.get("/evaluations/detection-runs").json()
+    rejected = client.get(
+        "/evaluations/compare",
+        params={
+            "baseline_evaluation_run_id": second_evaluation["evaluation_run_id"],
+            "candidate_evaluation_run_id": fixture_evaluation["evaluation_run_id"],
+        },
+    )
+    assert rejected.status_code == 409

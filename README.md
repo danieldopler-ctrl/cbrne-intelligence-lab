@@ -15,6 +15,7 @@ Incident monitoring foundation now includes:
 - PHMSA export importer with report-level deduplication and unit-aware release scoring.
 - NRC annual workbook importer with report-level numeric consequence scoring and NRC/PHMSA correlation review alerts.
 - AI Misuse Risk Assessment Module using public-safe abstract evaluation records and separate internal review routing.
+- Evaluation and backtesting workspace linking controlled or analyst-labeled benchmark cases to versioned detection runs and alert evidence.
 
 This build does **not** confirm malicious intent and does **not** automatically notify external agencies. Automated detections are review priorities.
 
@@ -92,6 +93,11 @@ model safety performance.
 
 The dashboard and default alert queue display the latest detection run so historical calibration runs are not added into current alert totals. Earlier runs remain stored for audit review.
 
+The evaluation workspace measures routing behavior against documented expectations. AI misuse
+fixture results are labeled `Fixture routing agreement`; they are not model safety performance.
+CHEM reviewed benchmarks require an analyst citation and rationale for selected public-source
+records; they do not establish intent or population-wide threat detection rates.
+
 ## Threat And Escalation Handling
 
 Alerts use `TL0` through `TL4` handling:
@@ -116,6 +122,7 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 - [Response Doctrine Mapping](docs/response-doctrine-mapping.md)
 - [Domain Pack Design](docs/domain-pack-design.md)
 - [AI Misuse Risk Assessment](docs/ai-misuse-risk-assessment.md)
+- [Evaluation And Backtesting](docs/evaluation-and-backtesting.md)
 
 ## Roadmap
 
@@ -126,9 +133,10 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 | Stage 2 | PHMSA deduplication, calibration, and unit-aware quantity scoring | Complete |
 | Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Complete, pushed at `58c9c25` |
 | Stage 4 | AI Misuse Risk Assessment Module | Complete, pushed at `3bed986` |
-| Stage 5 | WHO/CDC BIO monitoring connectors | Planned |
-| Stage 6 | Evaluation reports and evidence-constrained AI summaries | Planned |
-| Stage 7 | Domain expansion and deployment decision | Planned |
+| Stage 5 | Evaluation and backtesting infrastructure | In local development |
+| Stage 6 | WHO/CDC BIO monitoring connectors | Planned |
+| Stage 7 | Reporting and evidence-constrained AI support | Planned |
+| Stage 8 | Domain expansion and deployment decision | Planned |
 
 ## Purpose And Limits
 
