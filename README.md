@@ -17,8 +17,10 @@ Incident monitoring foundation now includes:
 - AI Misuse Risk Assessment Module using public-safe abstract evaluation records and separate internal review routing.
 - Evaluation and backtesting workspace linking controlled or analyst-labeled benchmark cases to versioned detection runs and alert evidence.
 - Biological monitoring work in local development using bounded WHO Disease Outbreak News and CDC NNDSS official public-data synchronization.
+- Source-cited report generation from analyst-reviewed alerts, with deterministic JSON and printable HTML export.
 
 This build does **not** confirm malicious intent and does **not** automatically notify external agencies. Automated detections are review priorities.
+Reports do **not** add narrative conclusions or call an AI service; they preserve recorded evidence, review disposition, and stated limits.
 
 ## Stack
 
@@ -116,6 +118,12 @@ threat prevalence or detection-performance claim. A revision-aware repeat sync o
 official week classified all 8,400 rows as identical duplicates, retained zero false revisions,
 and reproduced the 15-indicator result from the canonical import batch.
 
+Stage 7 adds deterministic source-cited reports. A report can include only alerts with a recorded
+analyst review, and it cannot mix CHEM, BIO, and AI misuse records. Each export preserves source
+citations, evidence fields, rule rationale, source limitations, analyst disposition, and a
+domain-specific disclosure. JSON download and browser-print output are available; AI-written
+summaries and automated delivery remain excluded.
+
 ## Threat And Escalation Handling
 
 Alerts use `TL0` through `TL4` handling:
@@ -141,6 +149,7 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 - [Domain Pack Design](docs/domain-pack-design.md)
 - [AI Misuse Risk Assessment](docs/ai-misuse-risk-assessment.md)
 - [Evaluation And Backtesting](docs/evaluation-and-backtesting.md)
+- [Report Generation](docs/report-generation.md)
 
 ## Roadmap
 
@@ -152,8 +161,8 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 | Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Complete, pushed at `58c9c25` |
 | Stage 4 | AI Misuse Risk Assessment Module | Complete, pushed at `3bed986` |
 | Stage 5 | Evaluation and backtesting infrastructure | Complete, pushed at `f8eba3a` |
-| Stage 6 | WHO/CDC BIO monitoring connectors | In local development |
-| Stage 7 | Reporting and evidence-constrained AI support | Planned |
+| Stage 6 | WHO/CDC BIO monitoring connectors | Complete, pushed at `7d4204d` |
+| Stage 7 | Deterministic source-cited reporting | In local development |
 | Stage 8 | Domain expansion and deployment decision | Planned |
 
 ## Purpose And Limits

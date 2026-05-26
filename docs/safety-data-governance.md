@@ -24,6 +24,8 @@ The platform supports defensive analysis of approved source records. It must not
 - AI misuse fixture descriptions must be safe for unrestricted public reading and remain at the behavioral-category level.
 - AI misuse fixture alerts are restricted to internal safety review and cannot create notification or incident-doctrine actions.
 - BIO monitoring uses public aggregate or official report data only; its v0.1 observation indicators cannot create notification or incident-doctrine actions.
+- Reports can be generated only from analyst-reviewed alerts and cannot combine records from separate domain packs.
+- Report export reproduces stored evidence, citations, limitations, and review records without AI-written text or automated delivery.
 
 ## Prohibited System Outputs
 
@@ -48,3 +50,10 @@ NNDSS weekly aggregate provisional reports. CDC source flags and missing compari
 retained rather than converted into detections. Automated BIO output is limited to `TL1`
 analyst-review indicators in this version and cannot be used as a finding of cause, deliberate
 release, intent, attribution, or emergency-plan applicability.
+
+## Report Export Control
+
+Source-cited reports are review records, not new findings. The reporting service requires an
+analyst review for every included alert, enforces one domain pack and rule-set version per
+report, and displays a domain-specific disclosure before export. JSON download and printable
+HTML are local analyst actions. Stage 7 does not send reports externally or call an AI service.

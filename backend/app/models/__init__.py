@@ -15,6 +15,7 @@ from app.models.entities import (
     NotificationAction,
     PlanApplicabilityReview,
     RawRecord,
+    Report,
     Source,
 )
 
@@ -35,5 +36,6 @@ __all__ = [
     "NotificationAction",
     "PlanApplicabilityReview",
     "RawRecord",
+    "Report",
     "Source",
 ]

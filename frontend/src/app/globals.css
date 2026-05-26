@@ -37,3 +37,22 @@ button:disabled {
   cursor: wait;
   opacity: 0.5;
 }
+
+@media print {
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: #111827;
+  }
+
+  .print-report,
+  .print-report * {
+    border-color: #cbd5e1 !important;
+    background: white !important;
+    color: #111827 !important;
+  }
+}

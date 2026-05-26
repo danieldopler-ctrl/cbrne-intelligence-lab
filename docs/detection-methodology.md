@@ -128,6 +128,18 @@ method can be validated against imported records.
 response-doctrine records. Any future escalation capability requires separate evidence,
 calibration, and review.
 
+## Stage 7 Source-Cited Reporting
+
+Stage 7 does not add detection rules or scoring thresholds. Reports are built only from alerts
+with a recorded analyst review and copy existing rule rationale, evidence fields, citations,
+source limitations, and analyst disposition into an exportable record. A single report cannot
+mix domain packs or rule-set versions.
+
+Each report displays a fixed domain disclosure so a CHEM indicator is not presented as intent,
+a BIO surveillance observation is not presented as deliberate-release attribution, and an AI
+misuse fixture review is not presented as real-world safety performance. No AI service or
+generated narrative participates in report creation.
+
 ### Initial BIO Validation Result
 
 On May 25, 2026, a bounded CDC NNDSS import for MMWR 2026 week 19 returned 8,400 aggregate

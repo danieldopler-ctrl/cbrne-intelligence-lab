@@ -79,6 +79,11 @@ export default async function Home() {
           <h2 className="mt-2 text-xl font-medium">Outbreak and surveillance review</h2>
           <p className="mt-2 text-sm text-[#9db2bd]">Review WHO outbreak reports and CDC provisional weekly surveillance indicators.</p>
         </Link>
+        <Link href="/reports" className="rounded border border-[#20323f] bg-[#111b23] p-6 hover:border-[#54b5c4]">
+          <p className="text-xs uppercase text-[#54b5c4]">06 / Report</p>
+          <h2 className="mt-2 text-xl font-medium">Source-cited reports</h2>
+          <p className="mt-2 text-sm text-[#9db2bd]">Export structured records from reviewed alerts with evidence and claim limits preserved.</p>
+        </Link>
       </section>
     </main>
   );

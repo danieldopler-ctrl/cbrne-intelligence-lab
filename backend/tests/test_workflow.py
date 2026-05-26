@@ -416,6 +416,16 @@ def test_cdc_nndss_connector_scores_only_numeric_unflagged_bio_records(monkeypat
     assert alert["recommended_threat_level"] == "TL1"
     detail = client.get(f"/alerts/{alert['id']}").json()
     assert detail["evidence"][0]["hazard_domain"] == "BIO"
+    review = client.post(
+        f"/alerts/{alert['id']}/reviews",
+        json={
+            "reviewer": "bio_reviewer",
+            "disposition": "MONITOR",
+            "threat_level": "TL1",
+            "note": "Reviewed provisional surveillance fixture.",
+        },
+    )
+    assert review.status_code == 200
     notification = client.post(
         f"/alerts/{alert['id']}/notifications",
         json={
@@ -676,3 +686,80 @@ def test_evaluation_comparison_requires_same_set() -> None:
         },
     )
     assert rejected.status_code == 409
+
+
+def test_source_cited_reports_require_review_and_preserve_domain_limits() -> None:
+    chem_alert = next(
+        item
+        for item in client.get("/alerts?domain_pack=CBRNE_CHEM&include_history=true").json()
+        if item["confirmed_threat_level"] == "TL3"
+    )
+    chem_report = client.post(
+        "/reports/generate",
+        json={"title": "Reviewed CHEM fixture report", "alert_ids": [chem_alert["id"]]},
+    )
+    assert chem_report.status_code == 201
+    chem_payload = chem_report.json()
+    assert chem_payload["domain_pack"] == "CBRNE_CHEM"
+    assert "do not establish deliberate release" in chem_payload["claim_summary"]
+    assert chem_payload["alerts"][0]["rule_rationale"] == chem_alert["rationale"]
+    assert chem_payload["alerts"][0]["evidence"][0]["source_citation"] == "https://example.test/source"
+    assert chem_payload["alerts"][0]["claim_limits"] == [
+        "This is a test fixture and not an operational source record."
+    ]
+
+    bio_alert = next(
+        item
+        for item in client.get("/alerts?domain_pack=CBRNE_BIO&include_history=true").json()
+        if item["confirmed_threat_level"] == "TL1"
+    )
+    bio_report = client.post(
+        "/reports/generate",
+        json={"title": "Reviewed BIO fixture report", "alert_ids": [bio_alert["id"]]},
+    )
+    assert bio_report.status_code == 201
+    bio_payload = bio_report.json()
+    assert "CDC NNDSS counts are provisional and subject to revision" in bio_payload["claim_summary"]
+    assert any(
+        "provisional" in item["source_limitations"].lower()
+        for item in bio_payload["alerts"][0]["evidence"]
+    )
+
+    misuse_alert = next(
+        item
+        for item in client.get("/alerts?domain_pack=AI_MISUSE&include_history=true").json()
+        if item["confirmed_review_level"] == "MR3"
+    )
+    misuse_report = client.post(
+        "/reports/generate",
+        json={"title": "Reviewed misuse fixture report", "alert_ids": [misuse_alert["id"]]},
+    )
+    assert misuse_report.status_code == 201
+    misuse_payload = misuse_report.json()
+    assert "controlled fixture routing behavior only" in misuse_payload["claim_summary"]
+    assert misuse_payload["alerts"][0]["review_level"] == "MR3"
+
+    mixed = client.post(
+        "/reports/generate",
+        json={"title": "Must reject mixed domains", "alert_ids": [chem_alert["id"], bio_alert["id"]]},
+    )
+    assert mixed.status_code == 409
+    who_unreviewed = next(
+        item
+        for item in client.get("/alerts?domain_pack=CBRNE_BIO&include_history=true").json()
+        if item["result_label"] == "OBSERVATION"
+    )
+    unreviewed = client.post(
+        "/reports/generate",
+        json={"title": "Must reject unreviewed record", "alert_ids": [who_unreviewed["id"]]},
+    )
+    assert unreviewed.status_code == 409
+
+    listed = client.get("/reports?domain_pack=CBRNE_BIO").json()
+    assert listed[0]["title"] == "Reviewed BIO fixture report"
+    export = client.get(f"/reports/{bio_payload['report_id']}/export.json")
+    assert export.status_code == 200
+    assert export.headers["content-disposition"] == (
+        f'attachment; filename="report-{bio_payload["report_id"]}.json"'
+    )
+    assert export.json() == bio_payload

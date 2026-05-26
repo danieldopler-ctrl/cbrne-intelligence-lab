@@ -151,6 +151,20 @@ class EvaluationCaseResult(Base):
     result_rationale: Mapped[str] = mapped_column(Text)
 
 
+class Report(Base):
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    domain_pack: Mapped[str] = mapped_column(String(50))
+    rule_set_version: Mapped[str] = mapped_column(String(30))
+    title: Mapped[str] = mapped_column(String(200))
+    alert_ids: Mapped[list] = mapped_column(JSON, default=list)
+    report_data: Mapped[dict] = mapped_column(JSON, default=dict)
+    claim_summary: Mapped[str] = mapped_column(Text)
+    generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Indicator(Base):
     __tablename__ = "indicators"
 

@@ -11,6 +11,7 @@ export function NavBar() {
           <Link href="/sources" className="hover:text-white">Sources & Ingest</Link>
           <Link href="/alerts" className="hover:text-white">Alerts</Link>
           <Link href="/evaluations" className="hover:text-white">Evaluations</Link>
+          <Link href="/reports" className="hover:text-white">Reports</Link>
         </nav>
       </div>
     </header>

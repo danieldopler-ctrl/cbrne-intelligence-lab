@@ -12,7 +12,7 @@ Registered official or approved source
   -> analyst review and threat-level confirmation
   -> notification and response-doctrine audit workflow
   -> evaluation runs linked to rule versions, evidence, and analyst labels
-  -> reviewed reporting (later stage)
+  -> source-cited reports assembled from reviewed alerts
 ```
 
 ## Separation Of Concerns
@@ -63,6 +63,18 @@ create a prior-maximum review indicator. Both rules are capped at `TL1` in this 
 BIO observation alerts do not create notification or response-doctrine records. Public official
 reporting and provisional surveillance counts do not establish deliberate release, cause,
 attribution, or emergency status.
+
+## Reviewed Report Boundary
+
+Stage 7 persists reports assembled from alerts that already have analyst review records. A report
+belongs to one domain pack and one rule-set version and stores selected alert IDs, existing
+evidence links, rule rationale, source limitations, disposition, notes, and a fixed domain
+disclosure. Report generation does not run a rule, revise an alert, contact an outside party, or
+write a narrative conclusion.
+
+The API provides report creation, report index/detail retrieval, reviewed-alert eligibility, and
+JSON export. The interface adds a report workspace and printable detail view. AI-written
+summaries remain excluded pending a separate approval and design decision.
 
 ## Growth Path
 

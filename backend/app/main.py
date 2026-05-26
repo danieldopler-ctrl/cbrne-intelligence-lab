@@ -12,6 +12,7 @@ from app.routers import (
     health,
     ingests,
     metrics,
+    reports,
     sources,
 )
 
@@ -38,3 +39,4 @@ app.include_router(detections.router)
 app.include_router(alerts.router)
 app.include_router(metrics.router)
 app.include_router(evaluations.router)
+app.include_router(reports.router)

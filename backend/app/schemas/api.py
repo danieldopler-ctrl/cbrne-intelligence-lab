@@ -175,6 +175,11 @@ class PlanReviewCreate(BaseModel):
     incident_reference: str | None = None
 
 
+class ReportGenerateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    alert_ids: list[int] = Field(min_length=1)
+
+
 class EvaluationSetCreate(BaseModel):
     name: str
     version: str
