@@ -139,20 +139,24 @@ def review_alert(alert_id: int, payload: ReviewCreate, db: Session = Depends(get
     alert = db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found.")
-    if alert.review_framework == "AI_MISUSE_REVIEW":
+    if alert.review_framework in {"AI_MISUSE_REVIEW", "FRAUD_REVIEW"}:
         if not payload.review_level:
+            raise HTTPException(status_code=422, detail="This review framework requires a review level.")
+        if alert.review_framework == "AI_MISUSE_REVIEW" and not payload.review_level.startswith("MR"):
             raise HTTPException(status_code=422, detail="Misuse review requires an MR0-MR3 review level.")
+        if alert.review_framework == "FRAUD_REVIEW" and not payload.review_level.startswith("FR"):
+            raise HTTPException(status_code=422, detail="Fraud review requires an FR0-FR3 review level.")
         review = AnalystReview(
             alert_id=alert_id,
             reviewer=payload.reviewer,
             disposition=payload.disposition,
             threat_level="N/A",
-            review_framework="AI_MISUSE_REVIEW",
+            review_framework=alert.review_framework,
             review_level=payload.review_level,
             note=payload.note,
         )
         alert.confirmed_review_level = payload.review_level
-        level_metadata = {"review_framework": "AI_MISUSE_REVIEW", "review_level": payload.review_level}
+        level_metadata = {"review_framework": alert.review_framework, "review_level": payload.review_level}
     else:
         if not payload.threat_level:
             raise HTTPException(status_code=422, detail="Threat review requires a TL0-TL4 threat level.")
@@ -195,6 +199,11 @@ def add_notification(
             status_code=409,
             detail="AI misuse fixture alerts use internal safety review only; notification actions are disabled.",
         )
+    if alert.review_framework == "FRAUD_REVIEW":
+        raise HTTPException(
+            status_code=409,
+            detail="Fraud fixture alerts use internal fraud review only; notification actions are disabled.",
+        )
     if alert_has_bio_evidence(db, alert_id):
         raise HTTPException(
             status_code=409,
@@ -222,6 +231,11 @@ def add_plan_review(
         raise HTTPException(
             status_code=409,
             detail="AI misuse fixture alerts are not incident records; doctrine review is disabled.",
+        )
+    if alert.review_framework == "FRAUD_REVIEW":
+        raise HTTPException(
+            status_code=409,
+            detail="Fraud fixture alerts are not CBRN-E incident records; doctrine review is disabled.",
         )
     if alert_has_bio_evidence(db, alert_id):
         raise HTTPException(

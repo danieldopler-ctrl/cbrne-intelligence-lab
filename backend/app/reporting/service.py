@@ -35,6 +35,12 @@ CLAIM_SUMMARIES = {
         "Results reflect controlled fixture routing behavior only. This is not real-world model "
         "safety performance or operational threat detection."
     ),
+    "FRAUD_MONITORING": (
+        "This report summarizes fraud risk assessment fixture conformance review records. "
+        "Results reflect controlled synthetic fixture routing behavior only. This is not "
+        "real-world fraud detection performance, real transaction data, or an operational "
+        "threat determination."
+    ),
 }
 
 

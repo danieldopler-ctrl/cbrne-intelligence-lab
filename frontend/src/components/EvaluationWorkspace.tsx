@@ -17,6 +17,14 @@ export function EvaluationWorkspace() {
     router.refresh();
   }
 
+  async function registerFraudFixture() {
+    setBusy(true);
+    const response = await fetch(`${API_BASE}/evaluations/register-fraud-fixture`, { method: "POST" });
+    setMessage(response.ok ? "Fraud fixture evaluation set registered." : "Registration failed. Run the safe fraud fixture first.");
+    setBusy(false);
+    router.refresh();
+  }
+
   async function createChemSet(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -93,6 +101,16 @@ export function EvaluationWorkspace() {
         </p>
         <button className="mt-4" type="button" onClick={registerFixture} disabled={busy}>
           Register Safe Fixture Evaluation
+        </button>
+      </div>
+      <div className="rounded border border-[#20323f] bg-[#111b23] p-5">
+        <p className="text-xs uppercase text-[#54b5c4]">Fixture Conformance</p>
+        <h2 className="mt-2 text-lg font-medium">Fraud safe fixture</h2>
+        <p className="mt-2 text-sm text-[#9db2bd]">
+          Registers synthetic pattern categories only. This is not real-world fraud detection performance.
+        </p>
+        <button className="mt-4" type="button" onClick={registerFraudFixture} disabled={busy}>
+          Register Fraud Fixture Evaluation
         </button>
       </div>
       <form onSubmit={runEvaluation} className="rounded border border-[#20323f] bg-[#111b23] p-5">

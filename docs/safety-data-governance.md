@@ -26,6 +26,7 @@ The platform supports defensive analysis of approved source records. It must not
 - BIO monitoring uses public aggregate or official report data only; its v0.1 observation indicators cannot create notification or incident-doctrine actions.
 - Reports can be generated only from analyst-reviewed alerts and cannot combine records from separate domain packs.
 - Report export reproduces stored evidence, citations, limitations, and review records without AI-written text or automated delivery.
+- Fraud portability testing uses synthetic abstract cases only and cannot create notification or CBRN-E doctrine actions.
 
 ## Prohibited System Outputs
 
@@ -57,3 +58,11 @@ Source-cited reports are review records, not new findings. The reporting service
 analyst review for every included alert, enforces one domain pack and rule-set version per
 report, and displays a domain-specific disclosure before export. JSON download and printable
 HTML are local analyst actions. Stage 7 does not send reports externally or call an AI service.
+
+## Fraud Fixture Control
+
+`FRAUD_MONITORING_V0.1` is a controlled architecture test, not a fraud-monitoring product. Its
+fixture contains abstract category flags and summaries only, with no personal identifiers,
+financial identifiers, real transactions, or referral instructions. `FRAUD_REVIEW` uses `FR0`
+through `FR3` and remains isolated from CBRN-E incident escalation. Any future use with real
+financial records requires separate privacy, authorization, security, and evaluation decisions.

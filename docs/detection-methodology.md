@@ -140,6 +140,24 @@ a BIO surveillance observation is not presented as deliberate-release attributio
 misuse fixture review is not presented as real-world safety performance. No AI service or
 generated narrative participates in report creation.
 
+## Stage 8 Fraud Fixture Rules
+
+Rule set identifier: `FRAUD_MONITORING_V0.1`
+
+| Rule | Fixture trigger | Output | Required interpretation |
+|---|---|---|---|
+| `FRD-VELOCITY-INDICATOR-001` | Abstract elevated-activity category | `FR1` | Synthetic route check only |
+| `FRD-DUPLICATE-INDICATOR-001` | Abstract duplicate-submission category | `FR1` | Synthetic route check only |
+| `FRD-AMOUNT-INDICATOR-001` | Abstract amount-outlier category | `FR1` | Synthetic route check only |
+| `FRD-IDENTITY-INDICATOR-001` | Abstract identity-consistency category | `FR1` | Synthetic route check only |
+| `FRD-COMPOUND-INDICATOR-001` | Two or more abstract categories | `FR2` | Synthetic multi-signal review route |
+| `FRD-HIGH-PRIORITY-INDICATOR-001` | Three or more abstract categories | `FR3` | Synthetic urgent-review route |
+
+`FRAUD_SAFE_EVAL_V0.1` contains abstract synthetic workflow cases only. These rules do not
+process real transactions, estimate fraud loss, measure real detection quality, or support an
+external referral. `FR` levels are separate from both CBRN-E `TL` levels and AI misuse `MR`
+levels. Notification and response-doctrine endpoints reject fraud fixture alerts.
+
 ### Initial BIO Validation Result
 
 On May 25, 2026, a bounded CDC NNDSS import for MMWR 2026 week 19 returned 8,400 aggregate

@@ -157,6 +157,29 @@ export function IngestWorkflow() {
     }
   }
 
+  async function runSafeFraudEvaluation() {
+    setBusy(true);
+    try {
+      const imported = await fetch(`${API_BASE}/fraud/import-safe-evaluation`, { method: "POST" });
+      const batch = await imported.json();
+      if (!imported.ok) throw new Error(batch.detail ?? "Safe fraud fixture import failed.");
+      const detection = await fetch(`${API_BASE}/detections/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ingest_batch_id: batch.ingest_batch_id, domain_pack: "FRAUD_MONITORING" }),
+      });
+      const result = await detection.json();
+      if (!detection.ok) throw new Error(result.detail ?? "Fraud fixture assessment failed.");
+      setMessage(
+        `Fraud safe fixture run complete: ${batch.records_received} synthetic cases and ${result.alerts_created} internal fraud-review signals. No real financial data or external referral was used.`,
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Fraud safe fixture assessment failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function syncCdcNndss(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -281,6 +304,17 @@ export function IngestWorkflow() {
           </p>
           <button className="mt-4" disabled={busy} onClick={runSafeMisuseEvaluation}>
             Run Safe AI Misuse Evaluation
+          </button>
+        </div>
+        <div className="mt-7 border-t border-[#294552] pt-5">
+          <p className="text-xs uppercase tracking-wide text-[#54b5c4]">Portability Experiment</p>
+          <h3 className="mt-2 text-lg font-medium">Fraud Monitoring Safe Fixture</h3>
+          <p className="mt-2 max-w-4xl text-sm text-[#9db2bd]">
+            Load abstract synthetic pattern records and run FR0-FR3 review routing. The fixture contains
+            no real people, accounts, transaction records, or external-referral actions.
+          </p>
+          <button className="mt-4" disabled={busy} onClick={runSafeFraudEvaluation}>
+            Run Safe Fraud Evaluation
           </button>
         </div>
       </section>

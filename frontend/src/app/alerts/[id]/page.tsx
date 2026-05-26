@@ -41,6 +41,8 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
     );
   }
   const isMisuseReview = alert.review_framework === "AI_MISUSE_REVIEW";
+  const isFraudReview = alert.review_framework === "FRAUD_REVIEW";
+  const isSpecialReview = isMisuseReview || isFraudReview;
   const isBioObservation = alert.evidence.some((item) => item.hazard_domain === "BIO");
   return (
     <main className="mx-auto max-w-6xl px-6 py-10">
@@ -54,11 +56,11 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
         <div className="rounded border border-[#20323f] bg-[#111b23] p-5 text-sm">
           <p>Score <strong className="ml-2 text-xl text-white">{alert.score}</strong></p>
           <p className="mt-2">
-            {isMisuseReview ? "Misuse Review Level" : "Recommended Threat Level"}:{" "}
-            {isMisuseReview ? alert.recommended_review_level : alert.recommended_threat_level}
+            {isMisuseReview ? "Misuse Review Level" : isFraudReview ? "Fraud Review Level" : "Recommended Threat Level"}:{" "}
+            {isSpecialReview ? alert.recommended_review_level : alert.recommended_threat_level}
           </p>
           <p className="mt-2">
-            Confirmed: {isMisuseReview ? alert.confirmed_review_level ?? "Pending review" : alert.confirmed_threat_level ?? "Pending review"}
+            Confirmed: {isSpecialReview ? alert.confirmed_review_level ?? "Pending review" : alert.confirmed_threat_level ?? "Pending review"}
           </p>
         </div>
       </div>
@@ -74,13 +76,19 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
           but it does not establish cause, deliberate release, intent, or an emergency action.
         </div>
       )}
-      {!isMisuseReview && !isBioObservation && alert.confirmed_threat_level === "TL4" && (
+      {isFraudReview && (
+        <div className="mt-7 rounded border border-[#294552] bg-[#101d24] p-5 text-[#b9d3dc]">
+          Controlled synthetic fraud-review case. This is not a real transaction or confirmed fraud
+          outcome and does not open CBRN-E notification or response-doctrine workflows.
+        </div>
+      )}
+      {!isSpecialReview && !isBioObservation && alert.confirmed_threat_level === "TL4" && (
         <div className="mt-7 rounded border border-[#614a20] bg-[#1a140b] p-5 text-[#e4c275]">
           An emergency or mandatory-report condition must not wait for application workflow. Contact appropriate
           responders and complete required reporting when facts support it.
         </div>
       )}
-      {!isMisuseReview && !isBioObservation && alert.confirmed_threat_level !== "TL4" && alert.recommended_threat_level === "TL3" && (
+      {!isSpecialReview && !isBioObservation && alert.confirmed_threat_level !== "TL4" && alert.recommended_threat_level === "TL3" && (
         <div className="mt-7 rounded border border-[#614a20] bg-[#1a140b] p-5 text-[#e4c275]">
           Urgent analyst review recommended. If review establishes immediate danger or a mandatory-report
           condition, do not delay appropriate response or reporting.
@@ -99,7 +107,7 @@ export default async function AlertPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
       </section>
-      {!isMisuseReview && !isBioObservation && <section className="mt-8 grid gap-6 lg:grid-cols-2">
+      {!isSpecialReview && !isBioObservation && <section className="mt-8 grid gap-6 lg:grid-cols-2">
         <div className="rounded border border-[#20323f] bg-[#111b23] p-6">
           <h2 className="text-xl font-medium">Recorded notification actions</h2>
           {alert.notifications.length === 0 ? (

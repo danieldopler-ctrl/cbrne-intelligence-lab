@@ -21,6 +21,7 @@ from app.models import (
 
 
 MISUSE_RANK = {"MR0": 0, "MR1": 1, "MR2": 2, "MR3": 3}
+FRAUD_RANK = {"FR0": 0, "FR1": 1, "FR2": 2, "FR3": 3}
 THREAT_RANK = {"TL0": 0, "TL1": 1, "TL2": 2, "TL3": 3, "TL4": 4}
 FIXTURE_CLAIM_LIMIT = (
     "This report measures agreement with controlled fixture expectations only. "
@@ -29,6 +30,10 @@ FIXTURE_CLAIM_LIMIT = (
 BENCHMARK_CLAIM_LIMIT = (
     "This report measures rule behavior on selected analyst-labeled public-source benchmark records. "
     "It does not establish intent, population-level detection rates, or operational readiness."
+)
+FRAUD_FIXTURE_CLAIM_LIMIT = (
+    "This report measures agreement with controlled synthetic fraud fixture expectations only. "
+    "It is not real-world fraud detection performance or real transaction analysis."
 )
 
 
@@ -103,8 +108,95 @@ def register_ai_misuse_fixture(db: Session) -> EvaluationSet:
     return evaluation_set
 
 
+def register_fraud_fixture(db: Session) -> EvaluationSet:
+    latest_event = db.scalar(
+        select(NormalizedEvent)
+        .where(NormalizedEvent.hazard_domain == "FRAUD")
+        .order_by(NormalizedEvent.id.desc())
+        .limit(1)
+    )
+    if not latest_event:
+        raise HTTPException(
+            status_code=409,
+            detail="Import the safe fraud evaluation set before registering its evaluation record.",
+        )
+    events = list(
+        db.scalars(
+            select(NormalizedEvent)
+            .where(
+                NormalizedEvent.hazard_domain == "FRAUD",
+                NormalizedEvent.ingest_batch_id == latest_event.ingest_batch_id,
+            )
+            .order_by(NormalizedEvent.source_record_id)
+        ).all()
+    )
+    evaluation_set = db.scalar(
+        select(EvaluationSet).where(
+            EvaluationSet.version == "FRAUD_SAFE_EVAL_V0.1",
+            EvaluationSet.domain_pack == "FRAUD_MONITORING",
+        )
+    )
+    if evaluation_set:
+        return evaluation_set
+    evaluation_set = EvaluationSet(
+        name="Fraud Safe Evaluation Set V0.1",
+        version="FRAUD_SAFE_EVAL_V0.1",
+        domain_pack="FRAUD_MONITORING",
+        review_framework="FRAUD_REVIEW",
+        evaluation_type="FIXTURE_CONFORMANCE",
+        description="Public-safe abstract fixture cases for deterministic fraud-review routing.",
+        source_basis="Committed synthetic fixture; no real people, accounts, transactions, or referrals.",
+        claim_limit=FRAUD_FIXTURE_CLAIM_LIMIT,
+        status="READY",
+    )
+    db.add(evaluation_set)
+    db.flush()
+    for event in events:
+        features = event.severity_features or {}
+        db.add(
+            EvaluationCase(
+                evaluation_set_id=evaluation_set.id,
+                case_key=event.source_record_id,
+                normalized_event_id=event.id,
+                source_record_id=event.source_record_id,
+                expected_review_level=str(features.get("expected_review_level", "FR0")),
+                expected_rule_ids=features.get("expected_rule_ids", []),
+                label_rationale="Expected route supplied by the public-safe controlled fixture.",
+                citation="FRAUD_SAFE_EVAL_V0.1 committed synthetic fixture record.",
+                label_status="FIXTURE_LABELED",
+            )
+        )
+    record_audit(
+        db,
+        "EVALUATION_SET_REGISTERED",
+        "evaluation_set",
+        evaluation_set.id,
+        actor="evaluation_service",
+        metadata={"version": evaluation_set.version, "cases": len(events)},
+    )
+    db.commit()
+    db.refresh(evaluation_set)
+    return evaluation_set
+
+
+def framework_ranks(review_framework: str) -> dict[str, int]:
+    if review_framework == "AI_MISUSE_REVIEW":
+        return MISUSE_RANK
+    if review_framework == "FRAUD_REVIEW":
+        return FRAUD_RANK
+    return THREAT_RANK
+
+
+def zero_level(review_framework: str) -> str:
+    if review_framework == "AI_MISUSE_REVIEW":
+        return "MR0"
+    if review_framework == "FRAUD_REVIEW":
+        return "FR0"
+    return "TL0"
+
+
 def validate_case_level(evaluation_set: EvaluationSet, level: str) -> None:
-    allowed = MISUSE_RANK if evaluation_set.review_framework == "AI_MISUSE_REVIEW" else THREAT_RANK
+    allowed = framework_ranks(evaluation_set.review_framework)
     if level not in allowed:
         raise HTTPException(
             status_code=422,
@@ -161,7 +253,7 @@ def _evaluate_case(
     evaluation_run: EvaluationRun,
     case: EvaluationCase,
 ) -> EvaluationCaseResult:
-    zero_level = "MR0" if evaluation_set.review_framework == "AI_MISUSE_REVIEW" else "TL0"
+    default_level = zero_level(evaluation_set.review_framework)
     event = db.get(NormalizedEvent, case.normalized_event_id) if case.normalized_event_id else None
     if (
         event
@@ -183,7 +275,7 @@ def _evaluate_case(
         return EvaluationCaseResult(
             evaluation_run_id=evaluation_run.id,
             evaluation_case_id=case.id,
-            generated_review_level=zero_level,
+            generated_review_level=default_level,
             generated_rule_ids=[],
             alert_ids=[],
             result="NOT_EVALUATED",
@@ -201,12 +293,12 @@ def _evaluate_case(
     ).all()
     distinct: dict[int, tuple[Alert, DetectionRule]] = {alert.id: (alert, rule) for alert, rule in rows}
     alerts = list(distinct.values())
-    ranks = MISUSE_RANK if evaluation_set.review_framework == "AI_MISUSE_REVIEW" else THREAT_RANK
+    ranks = framework_ranks(evaluation_set.review_framework)
     levels = [
         (alert.recommended_review_level or alert.recommended_threat_level)
         for alert, _ in alerts
     ]
-    generated = max(levels or [zero_level], key=lambda value: ranks[value])
+    generated = max(levels or [default_level], key=lambda value: ranks[value])
     result, rationale = classify_result(case.expected_review_level, generated, ranks)
     return EvaluationCaseResult(
         evaluation_run_id=evaluation_run.id,
@@ -317,7 +409,7 @@ def comparison_detail(db: Session, baseline: EvaluationRun, candidate: Evaluatio
     evaluation_set = db.get(EvaluationSet, baseline.evaluation_set_id)
     if not evaluation_set:
         raise HTTPException(status_code=404, detail="Evaluation set not found.")
-    ranks = MISUSE_RANK if evaluation_set.review_framework == "AI_MISUSE_REVIEW" else THREAT_RANK
+    ranks = framework_ranks(evaluation_set.review_framework)
     base_results = {
         result.evaluation_case_id: result
         for result in db.scalars(

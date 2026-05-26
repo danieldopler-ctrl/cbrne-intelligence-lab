@@ -15,7 +15,12 @@ The first pack adds:
 
 ## Fraud Extension Path
 
-A fraud domain pack can use the same core workflow, but it needs:
+`FRAUD_MONITORING_V0.1` now tests portability on synthetic, abstract fixture records. It reuses
+common storage, evidence, alert, review, evaluation, report, and audit records while adding
+fraud-specific rules and `FRAUD_REVIEW` routing. It cannot open CBRN-E notification or doctrine
+workflows.
+
+An operational fraud domain pack would still need:
 
 - Transactions, accounts, devices, merchants, claims, or chargeback entities.
 - Fraud-specific detection rules and outcome labels.

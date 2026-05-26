@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE } from "@/lib/api";
 
-type DomainPack = "CBRNE_CHEM" | "CBRNE_BIO" | "AI_MISUSE";
+type DomainPack = "CBRNE_CHEM" | "CBRNE_BIO" | "AI_MISUSE" | "FRAUD_MONITORING";
 
 type EligibleAlert = {
   id: number;
@@ -22,6 +22,8 @@ const CLAIM_SUMMARIES: Record<DomainPack, string> = {
     "This report summarizes official public-health surveillance and outbreak reporting analyst review indicators. CDC NNDSS counts are provisional and subject to revision. WHO Disease Outbreak News reports are official public-health event notices. Neither source establishes deliberate release, intent, or CBRN-E attribution.",
   AI_MISUSE:
     "This report summarizes AI misuse risk assessment fixture conformance review records. Results reflect controlled fixture routing behavior only. This is not real-world model safety performance or operational threat detection.",
+  FRAUD_MONITORING:
+    "This report summarizes fraud risk assessment fixture conformance review records. Results reflect controlled synthetic fixture routing behavior only. This is not real-world fraud detection performance, real transaction data, or an operational threat determination.",
 };
 
 export function ReportWorkspace() {
@@ -94,6 +96,7 @@ export function ReportWorkspace() {
             <option value="CBRNE_CHEM">CHEM / TL review</option>
             <option value="CBRNE_BIO">BIO / TL review</option>
             <option value="AI_MISUSE">AI misuse / MR review</option>
+            <option value="FRAUD_MONITORING">Fraud / FR review</option>
           </select>
         </label>
         <label className="text-sm">

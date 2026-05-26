@@ -18,7 +18,7 @@ export default async function ReportsPage({
 }) {
   const { domain } = await searchParams;
   const domainPack =
-    domain === "chem" ? "CBRNE_CHEM" : domain === "bio" ? "CBRNE_BIO" : domain === "misuse" ? "AI_MISUSE" : null;
+    domain === "chem" ? "CBRNE_CHEM" : domain === "bio" ? "CBRNE_BIO" : domain === "misuse" ? "AI_MISUSE" : domain === "fraud" ? "FRAUD_MONITORING" : null;
   const path = domainPack ? `/reports?domain_pack=${domainPack}` : "/reports";
   const reports = (await apiGet<ReportIndex[]>(path)) ?? [];
   return (
@@ -34,6 +34,7 @@ export default async function ReportsPage({
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/reports?domain=chem">CHEM</Link>
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/reports?domain=bio">BIO</Link>
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/reports?domain=misuse">AI Misuse</Link>
+        <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/reports?domain=fraud">Fraud</Link>
       </nav>
       <div className="mt-8 overflow-hidden rounded border border-[#20323f]">
         <table className="w-full text-left text-sm">

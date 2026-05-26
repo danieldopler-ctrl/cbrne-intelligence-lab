@@ -2,7 +2,7 @@
 
 CBRN-E Intelligence Lab is a real-data risk signal platform under development. It ingests approved public or user-provided datasets, normalizes source records, runs explainable detection rules, and creates evidence-linked alerts for analyst review.
 
-CBRN-E is the first domain pack. The platform core is designed so a later approved domain pack, such as fraud or supply-chain risk, can reuse ingestion, alerts, reviews, evaluation, and audit history while providing its own data model and detection logic.
+CBRN-E is the first operational domain. A controlled fraud fixture experiment demonstrates that the shared event, alert, evaluation, report, and audit workflow can be reused while each domain supplies its own rules and review controls.
 
 ## Current Build Status
 
@@ -18,9 +18,42 @@ Incident monitoring foundation now includes:
 - Evaluation and backtesting workspace linking controlled or analyst-labeled benchmark cases to versioned detection runs and alert evidence.
 - Biological monitoring work in local development using bounded WHO Disease Outbreak News and CDC NNDSS official public-data synchronization.
 - Source-cited report generation from analyst-reviewed alerts, with deterministic JSON and printable HTML export.
+- `FRAUD_MONITORING_V0.1` portability experiment using abstract synthetic records and separate `FR0` to `FR3` review routing.
 
 This build does **not** confirm malicious intent and does **not** automatically notify external agencies. Automated detections are review priorities.
 Reports do **not** add narrative conclusions or call an AI service; they preserve recorded evidence, review disposition, and stated limits.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Sources["Domain Inputs"]
+    C["CHEM: NOAA / PHMSA / NRC"]
+    B["BIO: CDC NNDSS / WHO DON"]
+    M["AI_MISUSE: safe fixture"]
+    F["FRAUD_MONITORING: safe fixture"]
+  end
+  subgraph Domain["Domain-Specific Adapters"]
+    DP["Rule engines and review frameworks<br/>CHEM / BIO / MR / FR"]
+  end
+  subgraph Core["Shared Core - FastAPI + PostgreSQL"]
+    I["Ingest"] --> N["Normalize"] --> DP --> D["Detect"] --> A["Alert"] --> R["Review"] --> E["Evaluate"] --> G["Report"]
+    L["Audit Log"]
+  end
+  UI["Next.js Analyst Interface"]
+  C --> I
+  B --> I
+  M --> I
+  F --> I
+  I --> L
+  D --> L
+  R --> L
+  E --> L
+  G --> L
+  UI <--> A
+  UI <--> E
+  UI <--> G
+```
 
 ## Stack
 
@@ -119,10 +152,17 @@ official week classified all 8,400 rows as identical duplicates, retained zero f
 and reproduced the 15-indicator result from the canonical import batch.
 
 Stage 7 adds deterministic source-cited reports. A report can include only alerts with a recorded
-analyst review, and it cannot mix CHEM, BIO, and AI misuse records. Each export preserves source
+analyst review, and it cannot mix CHEM, BIO, AI misuse, and fraud records. Each export preserves source
 citations, evidence fields, rule rationale, source limitations, analyst disposition, and a
 domain-specific disclosure. JSON download and browser-print output are available; AI-written
 summaries and automated delivery remain excluded.
+
+Stage 8 adds `FRAUD_MONITORING_V0.1` as a controlled portability experiment. Its 20 synthetic
+cases contain abstract category flags only and route through the separate `FRAUD_REVIEW`
+framework. Fraud fixture results cannot open CBRN-E notification or doctrine actions and do not
+measure real-world fraud performance. EXP and dedicated RN classification are documented as
+deferred expansion decisions because the current public-source and classification support does
+not justify event-level claims.
 
 ## Threat And Escalation Handling
 
@@ -150,20 +190,22 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 - [AI Misuse Risk Assessment](docs/ai-misuse-risk-assessment.md)
 - [Evaluation And Backtesting](docs/evaluation-and-backtesting.md)
 - [Report Generation](docs/report-generation.md)
+- [Expansion Decision](docs/expansion-decision.md)
+- [Deployment And Security Decision](docs/deployment-security.md)
+- [Portfolio Walkthrough](docs/portfolio-walkthrough.md)
 
 ## Roadmap
 
 | Stage | Objective | Status |
 |---|---|---|
-| Stage 0 | Verify initial public sources and common schema | Complete for NOAA, PHMSA, and NRC |
-| Stage 1 | Real data ingestion and evidence-linked CHEM alerts | Complete |
-| Stage 2 | PHMSA deduplication, calibration, and unit-aware quantity scoring | Complete |
-| Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Complete, pushed at `58c9c25` |
-| Stage 4 | AI Misuse Risk Assessment Module | Complete, pushed at `3bed986` |
-| Stage 5 | Evaluation and backtesting infrastructure | Complete, pushed at `f8eba3a` |
-| Stage 6 | WHO/CDC BIO monitoring connectors | Complete, pushed at `7d4204d` |
-| Stage 7 | Deterministic source-cited reporting | In local development |
-| Stage 8 | Domain expansion and deployment decision | Planned |
+| Stage 1 | Operational platform foundation: NOAA and PHMSA connectors | Complete |
+| Stage 2 | CHEM calibration: deduplication, consequence rules, unit normalization | Complete |
+| Stage 3 | NRC connector and `CHEM_HAZMAT_V0.4` | Complete |
+| Stage 4 | `AI_MISUSE_V0.1` risk assessment module | Complete |
+| Stage 5 | Evaluation and backtesting infrastructure | Complete |
+| Stage 6 | `BIO_MONITORING_V0.1`: CDC NNDSS and WHO DON | Complete |
+| Stage 7 | Source-cited report generation from analyst-reviewed alerts | Complete |
+| Stage 8 | Architecture, EXP/RN decision record, fraud fixture experiment, deployment record | Complete locally; pending review |
 
 ## Purpose And Limits
 

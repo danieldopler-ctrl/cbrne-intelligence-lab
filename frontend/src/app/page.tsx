@@ -84,6 +84,11 @@ export default async function Home() {
           <h2 className="mt-2 text-xl font-medium">Source-cited reports</h2>
           <p className="mt-2 text-sm text-[#9db2bd]">Export structured records from reviewed alerts with evidence and claim limits preserved.</p>
         </Link>
+        <Link href="/alerts?domain=fraud" className="rounded border border-[#20323f] bg-[#111b23] p-6 hover:border-[#54b5c4]">
+          <p className="text-xs uppercase text-[#54b5c4]">07 / Portability Test</p>
+          <h2 className="mt-2 text-xl font-medium">Fraud fixture review</h2>
+          <p className="mt-2 text-sm text-[#9db2bd]">Review synthetic FR-routed pattern indicators in a separate, non-incident workflow.</p>
+        </Link>
       </section>
     </main>
   );

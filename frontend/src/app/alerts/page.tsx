@@ -16,7 +16,7 @@ type Alert = {
 
 export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ domain?: string }> }) {
   const { domain } = await searchParams;
-  const domainPack = domain === "misuse" ? "AI_MISUSE" : domain === "bio" ? "CBRNE_BIO" : domain === "chem" ? "CBRNE_CHEM" : null;
+  const domainPack = domain === "misuse" ? "AI_MISUSE" : domain === "bio" ? "CBRNE_BIO" : domain === "chem" ? "CBRNE_CHEM" : domain === "fraud" ? "FRAUD_MONITORING" : null;
   const query = domainPack ? `/alerts?domain_pack=${domainPack}` : "/alerts";
   const alerts = (await apiGet<Alert[]>(query)) ?? [];
   return (
@@ -32,6 +32,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=chem">CHEM incidents</Link>
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=bio">BIO monitoring</Link>
         <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=misuse">AI misuse review</Link>
+        <Link className="rounded border border-[#20323f] px-3 py-2 text-[#75cad7]" href="/alerts?domain=fraud">Fraud review</Link>
       </nav>
       <div className="mt-8 overflow-hidden rounded border border-[#20323f]">
         <table className="w-full text-left text-sm">
@@ -55,6 +56,8 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
                 <td className="px-4 py-4">
                   {alert.review_framework === "AI_MISUSE_REVIEW"
                     ? `${alert.recommended_review_level} (Misuse Review)`
+                    : alert.review_framework === "FRAUD_REVIEW"
+                      ? `${alert.recommended_review_level} (Fraud Review)`
                     : alert.recommended_threat_level}
                 </td>
                 <td className="px-4 py-4">{alert.status}</td>

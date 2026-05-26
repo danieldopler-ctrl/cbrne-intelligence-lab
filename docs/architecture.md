@@ -1,5 +1,45 @@
 # Architecture
 
+## System Diagram
+
+```mermaid
+flowchart LR
+  subgraph Sources["Domain Inputs"]
+    C["CHEM: NOAA / PHMSA / NRC"]
+    B["BIO: CDC NNDSS / WHO DON"]
+    M["AI_MISUSE: safe fixture"]
+    F["FRAUD_MONITORING: safe fixture"]
+  end
+  subgraph Domain["Domain-Specific Adapters"]
+    DP["Rule engines and review frameworks<br/>CHEM / BIO / MR / FR"]
+  end
+  subgraph Core["Shared Platform Core - FastAPI + PostgreSQL"]
+    I["Source Registry and Ingest"]
+    N["Normalized Events"]
+    D["Detection Runs"]
+    A["Evidence-Linked Alerts"]
+    R["Analyst Review"]
+    E["Evaluation"]
+    G["Source-Cited Reports"]
+    L["Audit Log"]
+  end
+  UI["Analyst Interface<br/>Next.js"]
+  C --> I
+  B --> I
+  M --> I
+  F --> I
+  I --> N --> DP --> D --> A --> R --> E --> G
+  I --> L
+  D --> L
+  R --> L
+  E --> L
+  G --> L
+  UI <--> I
+  UI <--> A
+  UI <--> E
+  UI <--> G
+```
+
 ## Operational Flow
 
 ```text
@@ -64,6 +104,18 @@ BIO observation alerts do not create notification or response-doctrine records. 
 reporting and provisional surveillance counts do not establish deliberate release, cause,
 attribution, or emergency status.
 
+## Fraud Experiment Boundary
+
+`FRAUD_MONITORING_V0.1` uses a committed synthetic fixture with abstract pattern categories only.
+It reuses source, event, alert, evaluation, report, and audit records while adding a fraud rule
+adapter and the separate `FRAUD_REVIEW` framework (`FR0` through `FR3`). The fixture contains no
+real financial records or personal identifiers, and its outputs do not establish real-world
+fraud performance.
+
+Fraud fixture alerts cannot open CBRN-E notification or doctrine actions. A future operational
+fraud product would need lawful labeled records, privacy controls, and a separately approved
+referral process.
+
 ## Reviewed Report Boundary
 
 Stage 7 persists reports assembled from alerts that already have analyst review records. A report
@@ -78,7 +130,7 @@ summaries remain excluded pending a separate approval and design decision.
 
 ## Growth Path
 
-NOAA, PHMSA, and NRC connectors provide CHEM/hazmat source records after format verification. NRC reports are joined across official workbook sheets by `SEQNOS` and can be compared with PHMSA reports for analyst-reviewed correlation. Evaluation and backtesting were implemented before BIO source coverage. WHO DON and CDC NNDSS now extend monitoring into BIO locally; cross-source BIO correlation remains deferred until condition, place, and time matching can be documented and tested. Fraud or another risk domain later adds new event fields and rules while retaining the platform workflow.
+NOAA, PHMSA, and NRC connectors provide CHEM/hazmat source records after format verification. NRC reports are joined across official workbook sheets by `SEQNOS` and can be compared with PHMSA reports for analyst-reviewed correlation. WHO DON and CDC NNDSS extend monitoring into BIO locally; cross-source BIO correlation remains deferred until condition, place, and time matching can be documented and tested. The controlled fraud experiment now demonstrates reuse of the platform records and workflow with a new rule and review adapter. EXP and dedicated RN classification remain documented expansion decisions rather than implemented alert domains.
 
 The AI Misuse Risk Assessment Module is implemented before BIO expansion as a controlled safety
 analysis increment relevant to AI safety investigation. It is not a live model testing system.

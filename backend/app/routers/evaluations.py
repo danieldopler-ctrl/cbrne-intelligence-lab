@@ -9,6 +9,7 @@ from app.evaluation.service import (
     evaluation_run_detail,
     execute_evaluation,
     register_ai_misuse_fixture,
+    register_fraud_fixture,
     validate_case_level,
 )
 from app.models import DetectionRun, EvaluationCase, EvaluationRun, EvaluationSet, NormalizedEvent
@@ -89,9 +90,18 @@ def register_fixture(db: Session = Depends(get_db)) -> dict[str, int | str]:
     return {"evaluation_set_id": evaluation_set.id, "status": evaluation_set.status}
 
 
+@router.post("/register-fraud-fixture", status_code=201)
+def register_fraud_evaluation(db: Session = Depends(get_db)) -> dict[str, int | str]:
+    evaluation_set = register_fraud_fixture(db)
+    return {"evaluation_set_id": evaluation_set.id, "status": evaluation_set.status}
+
+
 @router.post("/sets", status_code=201)
 def create_evaluation_set(payload: EvaluationSetCreate, db: Session = Depends(get_db)) -> dict[str, int | str]:
-    expected_framework = "AI_MISUSE_REVIEW" if payload.domain_pack == "AI_MISUSE" else "THREAT_LEVEL"
+    expected_framework = {
+        "AI_MISUSE": "AI_MISUSE_REVIEW",
+        "FRAUD_MONITORING": "FRAUD_REVIEW",
+    }.get(payload.domain_pack, "THREAT_LEVEL")
     if payload.review_framework != expected_framework:
         raise HTTPException(status_code=422, detail="Review framework must match the domain pack.")
     if payload.domain_pack == "CBRNE_CHEM" and payload.evaluation_type != "REVIEWED_BENCHMARK":
@@ -120,7 +130,11 @@ def add_evaluation_case(
     event = db.get(NormalizedEvent, payload.normalized_event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Normalized event not found.")
-    event_pack = {"AI_MISUSE": "AI_MISUSE", "CHEM": "CBRNE_CHEM"}.get(event.hazard_domain)
+    event_pack = {
+        "AI_MISUSE": "AI_MISUSE",
+        "CHEM": "CBRNE_CHEM",
+        "FRAUD": "FRAUD_MONITORING",
+    }.get(event.hazard_domain)
     if not event_pack:
         raise HTTPException(status_code=409, detail="This event domain is not supported by Stage 5 evaluation.")
     if evaluation_set.domain_pack != event_pack:

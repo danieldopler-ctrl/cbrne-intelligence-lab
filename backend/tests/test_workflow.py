@@ -763,3 +763,104 @@ def test_source_cited_reports_require_review_and_preserve_domain_limits() -> Non
         f'attachment; filename="report-{bio_payload["report_id"]}.json"'
     )
     assert export.json() == bio_payload
+
+
+def test_fraud_fixture_routes_reviews_evaluates_reports_and_blocks_incident_actions() -> None:
+    imported = client.post("/fraud/import-safe-evaluation")
+    assert imported.status_code == 201
+    assert imported.json()["records_received"] == 20
+    batch_id = imported.json()["ingest_batch_id"]
+    events = client.get("/events?domain=FRAUD&limit=100").json()
+    fixture_events = [event for event in events if event["ingest_batch_id"] == batch_id]
+    assert len(fixture_events) == 20
+    assert {event["severity_features"]["expected_review_level"] for event in fixture_events} == {
+        "FR0",
+        "FR1",
+        "FR2",
+        "FR3",
+    }
+    prohibited_terms = {"@", "account id", "card number", "merchant name", "device fingerprint", "ip address"}
+    assert all(
+        not any(term in (event["narrative"] or "").lower() for term in prohibited_terms)
+        for event in fixture_events
+    )
+
+    run = client.post(
+        "/detections/run",
+        json={"ingest_batch_id": batch_id, "domain_pack": "FRAUD_MONITORING"},
+    )
+    assert run.status_code == 200
+    assert run.json()["rule_set_version"] == "FRAUD_MONITORING_V0.1"
+    alerts = client.get("/alerts?domain_pack=FRAUD_MONITORING").json()
+    assert all(alert["review_framework"] == "FRAUD_REVIEW" for alert in alerts)
+    assert {alert["recommended_review_level"] for alert in alerts} == {"FR1", "FR2", "FR3"}
+    fr3 = next(alert for alert in alerts if alert["recommended_review_level"] == "FR3")
+    review = client.post(
+        f"/alerts/{fr3['id']}/reviews",
+        json={
+            "reviewer": "fraud_reviewer",
+            "disposition": "INVESTIGATE",
+            "review_level": "FR3",
+            "note": "Synthetic fraud-routing fixture review.",
+        },
+    )
+    assert review.status_code == 200
+    assert review.json()["confirmed_review_level"] == "FR3"
+    for review_level in ("FR1", "FR2", "FR3"):
+        alert = next(item for item in alerts if item["recommended_review_level"] == review_level)
+        blocked_notification = client.post(
+            f"/alerts/{alert['id']}/notifications",
+            json={
+                "threat_level": "TL2",
+                "route_type": "INTERNAL",
+                "route_name": "Not applicable",
+                "reporting_assessment": "NOT_APPLICABLE",
+                "rationale": "Must be rejected for fraud fixture alert.",
+            },
+        )
+        assert blocked_notification.status_code == 409
+        blocked_doctrine = client.post(
+            f"/alerts/{alert['id']}/plan-reviews",
+            json={
+                "plan_code": "NIMS_ICS",
+                "applicability": "NOT_APPLICABLE",
+                "rationale": "Must be rejected for fraud fixture alert.",
+                "reviewer": "fraud_reviewer",
+            },
+        )
+        assert blocked_doctrine.status_code == 409
+
+    registered = client.post("/evaluations/register-fraud-fixture")
+    assert registered.status_code == 201
+    evaluated = client.post(
+        "/evaluations/run",
+        json={
+            "evaluation_set_id": registered.json()["evaluation_set_id"],
+            "detection_run_id": run.json()["detection_run_id"],
+        },
+    )
+    assert evaluated.status_code == 201
+    result = client.get(f"/evaluations/runs/{evaluated.json()['evaluation_run_id']}").json()
+    assert result["evaluation_set"]["review_framework"] == "FRAUD_REVIEW"
+    assert result["measures"]["cases_evaluated"] == 20
+    assert result["measures"]["matched_routes"] == 20
+    direct = client.get("/fraud/evaluation/latest").json()
+    assert direct["fixture_routing_agreement"] == 20
+
+    report = client.post(
+        "/reports/generate",
+        json={"title": "Reviewed fraud fixture report", "alert_ids": [fr3["id"]]},
+    )
+    assert report.status_code == 201
+    assert report.json()["domain_pack"] == "FRAUD_MONITORING"
+    assert "not real-world fraud detection performance" in report.json()["claim_summary"].lower()
+    chem_alert = next(
+        item
+        for item in client.get("/alerts?domain_pack=CBRNE_CHEM&include_history=true").json()
+        if item["confirmed_threat_level"] == "TL3"
+    )
+    mixed = client.post(
+        "/reports/generate",
+        json={"title": "Must reject mixed fraud and chemical records", "alert_ids": [fr3["id"], chem_alert["id"]]},
+    )
+    assert mixed.status_code == 409

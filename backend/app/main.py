@@ -9,6 +9,7 @@ from app.routers import (
     detections,
     evaluations,
     events,
+    fraud,
     health,
     ingests,
     metrics,
@@ -33,6 +34,7 @@ app.include_router(health.router)
 app.include_router(sources.router)
 app.include_router(connectors.router)
 app.include_router(ai_misuse.router)
+app.include_router(fraud.router)
 app.include_router(ingests.router)
 app.include_router(events.router)
 app.include_router(detections.router)

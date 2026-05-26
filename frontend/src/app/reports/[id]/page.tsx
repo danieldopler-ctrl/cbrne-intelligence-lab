@@ -77,7 +77,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ i
         {report.alerts.map((alert) => (
           <article key={alert.alert_id} className="rounded border border-[#20323f] bg-[#111b23] p-6">
             <p className="text-xs uppercase text-[#54b5c4]">
-              {alert.review_framework === "AI_MISUSE_REVIEW" ? "Misuse Review" : "Threat Review"} / {alert.review_level}
+              {alert.review_framework === "AI_MISUSE_REVIEW" ? "Misuse Review" : alert.review_framework === "FRAUD_REVIEW" ? "Fraud Review" : "Threat Review"} / {alert.review_level}
             </p>
             <h2 className="mt-2 text-xl font-medium">{alert.alert_title}</h2>
             <p className="mt-3 text-sm text-[#9db2bd]">

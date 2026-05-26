@@ -13,7 +13,7 @@ intent or claim complete operational detection performance.
 
 | Type | Input | Interpretable output | Limit |
 |---|---|---|---|
-| `FIXTURE_CONFORMANCE` | Controlled safe evaluation records, including `AI_MISUSE_SAFE_EVAL_V0.1` | Agreement between expected and generated routes | Not real-world model safety or threat-detection performance |
+| `FIXTURE_CONFORMANCE` | Controlled safe evaluation records, including `AI_MISUSE_SAFE_EVAL_V0.1` and `FRAUD_SAFE_EVAL_V0.1` | Agreement between expected and generated routes | Not real-world model safety, fraud-detection, or threat-detection performance |
 | `REVIEWED_BENCHMARK` | Selected public-source CHEM events with analyst citation and expected route | Rule behavior on the labeled records | Not population-level detection rates, intent, or operational readiness |
 | Comparison view | Compatible runs for the same evaluation set | Route and workload changes between runs | Does not prove one version is better without adequate labels |
 
@@ -26,7 +26,7 @@ dataset automatically.
 
 An evaluation run links a set to a versioned detection run. Each case result records:
 
-- Expected route (`TL` or `MR`, never mixed within a set).
+- Expected route (`TL`, `MR`, or `FR`, never mixed within a set).
 - Highest generated route.
 - Linked alert IDs and rule IDs.
 - Whether the route matched, missed expected priority, introduced unexpected high priority,
@@ -54,6 +54,7 @@ adequate reviewed outcome labels and explicitly documents sampling limits.
 
 - Existing CHEM detections remain at `CHEM_HAZMAT_V0.4`; this stage does not change thresholds.
 - Existing AI misuse detections remain at `AI_MISUSE_V0.1`; the fixture stays abstract and public safe.
+- Fraud fixture conformance uses `FRAUD_MONITORING_V0.1`; it contains no real financial records or identifiers.
 - Evaluation does not create emergency, doctrine, or external-notification actions.
 - No BIO connector, live AI request, or generated narrative is included in Stage 5.
 

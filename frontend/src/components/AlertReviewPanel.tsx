@@ -15,6 +15,8 @@ export function AlertReviewPanel({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const isMisuseReview = reviewFramework === "AI_MISUSE_REVIEW";
+  const isFraudReview = reviewFramework === "FRAUD_REVIEW";
+  const isSpecialReview = isMisuseReview || isFraudReview;
 
   async function submitReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,9 +69,9 @@ export function AlertReviewPanel({
         <h2 className="text-xl font-medium">Analyst disposition</h2>
         <div className="mt-5 space-y-4">
           <input name="reviewer" placeholder="Reviewer identifier" required />
-          {isMisuseReview ? (
-            <select name="review_level" defaultValue="MR2">
-              {["MR0", "MR1", "MR2", "MR3"].map((level) => <option key={level}>{level}</option>)}
+          {isSpecialReview ? (
+            <select name="review_level" defaultValue={isMisuseReview ? "MR2" : "FR2"}>
+              {(isMisuseReview ? ["MR0", "MR1", "MR2", "MR3"] : ["FR0", "FR1", "FR2", "FR3"]).map((level) => <option key={level}>{level}</option>)}
             </select>
           ) : (
             <select name="threat_level" defaultValue="TL2">
@@ -85,7 +87,7 @@ export function AlertReviewPanel({
           <button disabled={busy} type="submit">Record Review</button>
         </div>
       </form>
-      {!isMisuseReview && !isBioObservation && <form onSubmit={submitPlan} className="rounded border border-[#20323f] bg-[#111b23] p-6">
+      {!isSpecialReview && !isBioObservation && <form onSubmit={submitPlan} className="rounded border border-[#20323f] bg-[#111b23] p-6">
         <h2 className="text-xl font-medium">Response doctrine review</h2>
         <p className="mt-2 text-sm text-[#9db2bd]">
           Potential applicability is not agency activation. Use verified status only with a documented reference.
@@ -112,7 +114,7 @@ export function AlertReviewPanel({
           <button disabled={busy} type="submit">Record Plan Review</button>
         </div>
       </form>}
-      {!isMisuseReview && !isBioObservation && <form onSubmit={submitNotification} className="rounded border border-[#20323f] bg-[#111b23] p-6 lg:col-span-2">
+      {!isSpecialReview && !isBioObservation && <form onSubmit={submitNotification} className="rounded border border-[#20323f] bg-[#111b23] p-6 lg:col-span-2">
         <h2 className="text-xl font-medium">Notification assessment</h2>
         <p className="mt-2 text-sm text-[#9db2bd]">
           This records a decision or completed contact. The platform does not send notifications.
@@ -142,6 +144,14 @@ export function AlertReviewPanel({
           <h2 className="text-xl font-medium">Internal safety review only</h2>
           <p className="mt-3 text-sm text-[#9db2bd]">
             External notification and response-doctrine actions are disabled for synthetic AI misuse evaluation cases.
+          </p>
+        </div>
+      )}
+      {isFraudReview && (
+        <div className="rounded border border-[#294552] bg-[#101d24] p-6">
+          <h2 className="text-xl font-medium">Internal fraud review only</h2>
+          <p className="mt-3 text-sm text-[#9db2bd]">
+            Notification and CBRN-E response-doctrine actions are disabled for synthetic fraud evaluation cases.
           </p>
         </div>
       )}

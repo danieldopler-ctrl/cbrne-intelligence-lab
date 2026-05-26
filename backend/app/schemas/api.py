@@ -90,7 +90,7 @@ class EventOut(BaseModel):
 
 class DetectionRequest(BaseModel):
     ingest_batch_id: int | None = None
-    domain_pack: Literal["CBRNE_CHEM", "CBRNE_BIO", "AI_MISUSE"] = "CBRNE_CHEM"
+    domain_pack: Literal["CBRNE_CHEM", "CBRNE_BIO", "AI_MISUSE", "FRAUD_MONITORING"] = "CBRNE_CHEM"
     include_observations: bool = False
 
 
@@ -136,7 +136,7 @@ class ReviewCreate(BaseModel):
         "CLOSED_NO_ACTION",
     ]
     threat_level: Literal["TL0", "TL1", "TL2", "TL3", "TL4"] | None = None
-    review_level: Literal["MR0", "MR1", "MR2", "MR3"] | None = None
+    review_level: Literal["MR0", "MR1", "MR2", "MR3", "FR0", "FR1", "FR2", "FR3"] | None = None
     note: str
 
 
@@ -183,8 +183,8 @@ class ReportGenerateRequest(BaseModel):
 class EvaluationSetCreate(BaseModel):
     name: str
     version: str
-    domain_pack: Literal["CBRNE_CHEM", "AI_MISUSE"]
-    review_framework: Literal["THREAT_LEVEL", "AI_MISUSE_REVIEW"]
+    domain_pack: Literal["CBRNE_CHEM", "AI_MISUSE", "FRAUD_MONITORING"]
+    review_framework: Literal["THREAT_LEVEL", "AI_MISUSE_REVIEW", "FRAUD_REVIEW"]
     evaluation_type: Literal["FIXTURE_CONFORMANCE", "REVIEWED_BENCHMARK"]
     description: str
     source_basis: str
