@@ -125,7 +125,7 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 | Stage 1 | Real data ingestion and evidence-linked CHEM alerts | Complete |
 | Stage 2 | PHMSA deduplication, calibration, and unit-aware quantity scoring | Complete |
 | Stage 3 | NRC connector, count-tier rules, and cross-source correlation | Complete, pushed at `58c9c25` |
-| Stage 4 | AI Misuse Risk Assessment Module | In local development |
+| Stage 4 | AI Misuse Risk Assessment Module | Complete, pushed at `3bed986` |
 | Stage 5 | WHO/CDC BIO monitoring connectors | Planned |
 | Stage 6 | Evaluation reports and evidence-constrained AI summaries | Planned |
 | Stage 7 | Domain expansion and deployment decision | Planned |
