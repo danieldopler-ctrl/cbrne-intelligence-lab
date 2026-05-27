@@ -10,6 +10,7 @@ backend/migration-test.db
 backend/local-dev.db
 node_modules/
 .next/
+frontend/.next-stale*/
 frontend/.env.local
 data/raw/*
 !data/raw/.gitkeep

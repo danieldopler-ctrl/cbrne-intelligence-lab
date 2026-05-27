@@ -193,6 +193,9 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 - [Expansion Decision](docs/expansion-decision.md)
 - [Deployment And Security Decision](docs/deployment-security.md)
 - [Portfolio Walkthrough](docs/portfolio-walkthrough.md)
+- [Portfolio Case Study](docs/portfolio-case-study.md)
+- [Five-Minute Walkthrough](docs/five-minute-walkthrough.md)
+- [Private Operational Extension](docs/private-operational-extension.md)
 
 ## Roadmap
 
@@ -205,7 +208,7 @@ For `TL3` and `TL4`, the platform records possible applicability of `NIMS/ICS`, 
 | Stage 5 | Evaluation and backtesting infrastructure | Complete |
 | Stage 6 | `BIO_MONITORING_V0.1`: CDC NNDSS and WHO DON | Complete |
 | Stage 7 | Source-cited report generation from analyst-reviewed alerts | Complete |
-| Stage 8 | Architecture, EXP/RN decision record, fraud fixture experiment, deployment record | Complete locally; pending review |
+| Stage 8 | Architecture, EXP/RN decision record, fraud fixture experiment, deployment record | Complete |
 
 ## Purpose And Limits
 
