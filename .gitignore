@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 backend/test-*.db
 backend/test-data/
+backend/data/
 backend/migration-test.db
 backend/local-dev.db
 node_modules/

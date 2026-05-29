@@ -14,6 +14,12 @@ type Alert = {
   created_at: string;
 };
 
+function displayAlertTitle(title: string) {
+  const separatorIndex = title.lastIndexOf(": ");
+  const trimmed = separatorIndex > 0 ? title.slice(0, separatorIndex) : title;
+  return trimmed.length > 60 ? `${trimmed.slice(0, 57)}...` : trimmed;
+}
+
 export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ domain?: string }> }) {
   const { domain } = await searchParams;
   const domainPack = domain === "misuse" ? "AI_MISUSE" : domain === "bio" ? "CBRNE_BIO" : domain === "chem" ? "CBRNE_CHEM" : domain === "fraud" ? "FRAUD_MONITORING" : null;
@@ -48,7 +54,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: Promi
               <tr key={alert.id} className="border-t border-[#20323f]">
                 <td className="px-4 py-4">
                   <Link className="text-[#75cad7] hover:text-white" href={`/alerts/${alert.id}`}>
-                    {alert.title}
+                    {displayAlertTitle(alert.title)}
                   </Link>
                 </td>
                 <td className="px-4 py-4">{alert.result_label}</td>

@@ -23,6 +23,19 @@ Incident monitoring foundation now includes:
 This build does **not** confirm malicious intent and does **not** automatically notify external agencies. Automated detections are review priorities.
 Reports do **not** add narrative conclusions or call an AI service; they preserve recorded evidence, review disposition, and stated limits.
 
+## Visual Walkthrough
+
+Screenshots in `docs/assets/` show the primary analyst workflow:
+
+| View | Purpose |
+|---|---|
+| ![Dashboard](docs/assets/screenshot-dashboard.png) | Dashboard metrics and workflow cards |
+| ![AI misuse alert queue](docs/assets/screenshot-alert-queue.png) | AI misuse review queue with MR-routed safety signals |
+| ![Alert detail](docs/assets/screenshot-alert-detail.png) | Evidence, source limitations, and analyst disposition |
+| ![Evaluation workspace](docs/assets/screenshot-evaluation.png) | Fixture conformance and versioned evaluation runs |
+| ![Source-cited report](docs/assets/screenshot-report.png) | Reviewed report output with claim limits preserved |
+| ![Sources and ingest](docs/assets/screenshot-sources.png) | Official connectors and controlled fixture workflows |
+
 ## Architecture
 
 ```mermaid
@@ -163,6 +176,42 @@ framework. Fraud fixture results cannot open CBRN-E notification or doctrine act
 measure real-world fraud performance. EXP and dedicated RN classification are documented as
 deferred expansion decisions because the current public-source and classification support does
 not justify event-level claims.
+
+## Safety Boundaries
+
+This repository is designed as a defensive analyst workflow and portfolio artifact. It intentionally
+does not:
+
+- Confirm malicious intent, attribution, criminal activity, or emergency status.
+- Provide instructions, sourcing guidance, process steps, or optimization guidance for harmful CBRN-E capability.
+- Store harmful prompt corpora, live jailbreak attempts, or operationally specific AI misuse examples.
+- Call live AI models for summaries, scoring, or red-team interaction.
+- Automatically contact response agencies, law enforcement, public-health authorities, or external systems.
+- Treat BIO surveillance observations as deliberate-release findings.
+- Treat synthetic AI misuse or fraud fixtures as real user activity, real incidents, or model-performance proof.
+- Mix CHEM, BIO, AI misuse, and fraud records in a single reviewed report.
+
+Public fixtures use abstraction-only descriptions. AI misuse records are routed through `MR0` to
+`MR3` internal review levels and cannot open notification or response-doctrine workflows. Fraud
+fixtures use `FR0` to `FR3` and are similarly isolated. Operational deployment, restricted data,
+private query logs, or AI-written report summaries require a separate approval and security review.
+
+## Evaluation Methodology
+
+Evaluation is treated as evidence-linked routing assessment, not broad performance proof.
+
+| Evaluation term | Meaning | Limit |
+|---|---|---|
+| Fixture conformance | Controlled safe records route to expected `MR` or `FR` levels | Not real-world model safety or fraud detection performance |
+| Reviewed benchmark | Analyst-labeled public-source CHEM event with citation and expected route | Not population-level detection performance |
+| Routing agreement | Generated route matches the documented expected route | Not accuracy unless the evaluation set supports that claim |
+| Missed expected priority | Generated route falls below a documented high-priority expectation | Requires reviewed labels |
+| Unexpected high priority | Generated route rises above a documented low-priority expectation | Supports false-positive review, not standalone rate claims |
+| Workload comparison | Compatible runs are compared for alert count and route changes | Historical runs are not added into current alert totals |
+
+The platform records signal quality indicators, missed-route review, unexpected-escalation review,
+and workload changes. Precision, recall, false-positive rate, and false-negative rate are deferred
+until an approved labeled benchmark design supports those measures.
 
 ## Threat And Escalation Handling
 
